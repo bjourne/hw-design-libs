@@ -3,16 +3,17 @@
 // This module is an adaptation of
 // https://github.com/projf/projf-explore/blob/main/lib/maths/div_int.sv
 
-module divider #(parameter WIDTH=4) (input wire logic clk,
-                                     input wire logic start,
-                                     output     logic busy,
-                                     output     logic valid,
-                                     output     logic dbz,
-                                     input wire logic [WIDTH-1:0] x,
-                                     input wire logic [WIDTH-1:0] y,
-                                     output     logic [WIDTH-1:0] q,
-                                     output     logic [WIDTH-1:0] r
-                                     );
+module divider #(parameter WIDTH=4) (
+    input wire logic clk,
+    input wire logic start,
+    output     logic busy,
+    output     logic valid,
+    output     logic dbz,
+    input wire logic [WIDTH-1:0] x,
+    input wire logic [WIDTH-1:0] y,
+    output     logic [WIDTH-1:0] q,
+    output     logic [WIDTH-1:0] r
+);
 
     logic [WIDTH - 1:0] y1;
     logic [WIDTH - 1:0] q1, q1_next;

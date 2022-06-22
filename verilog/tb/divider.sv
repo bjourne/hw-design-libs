@@ -1,6 +1,6 @@
 `include "divider.sv"
 module divider_tb();
-    localparam WIDTH = 6;
+    localparam WIDTH = 8;
 
     reg clk, rst, start, busy, dbz;
     reg [WIDTH - 1:0] x, y;
@@ -29,8 +29,7 @@ module divider_tb();
         tick;
         start = 0;
 
-        repeat(WIDTH)
-            tick;
+        repeat(WIDTH) tick;
 
         assert (q == 3);
         assert (r == 2);
@@ -43,8 +42,19 @@ module divider_tb();
         assert (dbz == 1);
         assert (val == 0);
 
+        // We don't support negative numbers.
+        x = -8;
+        y = -2;
+        start = 1;
+        tick;
+
+        start = 0;
+        repeat(WIDTH) tick;
+        assert (val == 1);
+        assert (q == 0);
+        assert  (r == 248);
+
         #5 $finish;
     end
     divider #(.WIDTH(WIDTH)) div (clk, start, busy, val, dbz, x, y, q, r);
-
 endmodule
