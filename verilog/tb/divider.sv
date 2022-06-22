@@ -15,7 +15,7 @@ module divider_tb();
 
     initial begin
         $display ("time clk rst start  x  y  q  r val busy dbz");
-        $monitor ("%3d    %b   %b     %b %2d %2d %2d %2d   %b    %b   %b",
+        $monitor ("%3d    %b   %b     %b %3d %3d %3d %3d   %b    %b   %b",
   	          $time, clk, rst, start, x, y, q, r, val, busy, dbz);
         clk = 1;
         rst = 1;
