@@ -19,8 +19,11 @@ function int matmul_read_time(
     matmul_dims_t b);
     return max(a.rows * a.cols, b.rows * b.cols);
 endfunction
-
-
+function int matmul_write_time(
+    matmul_dims_t a,
+    matmul_dims_t b);
+    return a.rows * b.cols;
+endfunction
 
 module matmul #(parameter BUF_SIZE=1024) (
     input wire logic clk,

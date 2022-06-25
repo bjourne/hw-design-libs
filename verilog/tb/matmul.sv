@@ -16,6 +16,7 @@ module matmul_tb();
 
     // Matrix C
     reg int data_c [0:BUF_SIZE - 1];
+    reg matmul_dims_t dims_c;
     reg int out_c, mat_c_els;
 
     // General control
@@ -29,9 +30,12 @@ module matmul_tb();
     end
     endtask
 
+    // Copy paste cause I can't figure out how to pass array
+    // references.
     task automatic read_matrices(
         input string name_a,
-        input string name_b
+        input string name_b,
+        input string name_c
     ); begin
         int r, f;
         f = $fopen(name_a, "rb");
@@ -52,9 +56,58 @@ module matmul_tb();
         end
         $fclose(f);
 
+        f = $fopen(name_c, "rb");
+        r = $fscanf(f, "%d", dims_c.rows);
+        r = $fscanf(f, "%d", dims_c.cols);
+        for (int i = 0; i < dims_c.rows * dims_c.cols; i++) begin
+            r = $fscanf(f, "%d", data_c[i]);
+            assert(r == 1);
+        end
+        $fclose(f);
+
         mat_a_els = dims_a.rows * dims_a.cols;
         mat_b_els = dims_b.rows * dims_b.cols;
-        mat_c_els = dims_a.rows * dims_b.cols;
+        mat_c_els = dims_c.rows * dims_c.cols;
+    end
+    endtask
+
+    task automatic run_test(
+        input string name_a,
+        input string name_b,
+        input string name_c
+    ); begin
+        read_matrices(name_a, name_b, name_c);
+        start = 1;
+        tick;
+
+        assert(state == READ);
+        start = 0;
+
+        for (int i = 0;
+             i < matmul_read_time(dims_a, dims_b);
+             i = i + 1) begin
+            if (i < mat_a_els) begin
+                in_a = data_a[i];
+            end
+            if (i < mat_b_els) begin
+                in_b = data_b[i];
+            end
+            tick;
+        end
+        assert(state == CALCULATE);
+
+        repeat (matmul_compute_time(dims_a, dims_b))
+            tick;
+
+        assert(state == WRITE);
+        for (int i = 0;
+             i < matmul_write_time(dims_a, dims_b);
+             i = i + 1) begin
+            tick;
+            assert(out_c == data_c[i]);
+        end
+        tick;
+        assert(state == IDLE);
     end
     endtask
 
@@ -97,44 +150,16 @@ module matmul_tb();
         assert(state == IDLE);
 
         // Now for real
-        read_matrices(
+        run_test(
             "verilog/tb/mat_01_02x02.mem",
-            "verilog/tb/mat_01_02x02.mem");
-        start = 1;
-        tick;
-
-        assert(state == READ);
-        start = 0;
-
-        for (int i = 0;
-             i < matmul_read_time(dims_a, dims_b);
-             i = i + 1) begin
-            if (i < mat_a_els) begin
-                in_a = data_a[i];
-            end
-            if (i < mat_b_els) begin
-                in_b = data_b[i];
-            end
-            tick;
-        end
-        assert(state == CALCULATE);
-
-        repeat (matmul_compute_time(dims_a, dims_b))
-            tick;
-
-        assert(state == WRITE);
-        for (int i = 0; i < mat_c_els; i = i + 1) begin
-            tick;
-            data_c[i] = out_c;
-        end
-        tick;
-
-        assert(state == IDLE);
-        assert(data_c[0] == 700);
-        assert(data_c[1] == 1000);
-        assert(data_c[2] == 1500);
-        assert(data_c[3] == 2200);
-
+            "verilog/tb/mat_01_02x02.mem",
+            "verilog/tb/mat_02_02x02.mem"
+        );
+        run_test(
+            "verilog/tb/mat_03_16x16.mem",
+            "verilog/tb/mat_04_16x16.mem",
+            "verilog/tb/mat_05_16x16.mem"
+        );
         #5 $finish;
     end
 
