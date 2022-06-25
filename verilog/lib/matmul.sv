@@ -35,18 +35,18 @@ module matmul #(parameter BUF_SIZE=1024) (
     input wire int in_b,
     output int out_c
 );
-    reg int cnt_a, cnt_b, cnt_c;
-    reg int idx_a, idx_b, idx_c;
-    reg int data_a [0:BUF_SIZE - 1];
-    reg int data_b [0:BUF_SIZE - 1];
-    reg int data_c [0:BUF_SIZE - 1];
+    int cnt_a, cnt_b, cnt_c;
+    int idx_a, idx_b, idx_c;
+    int data_a [0:BUF_SIZE - 1];
+    int data_b [0:BUF_SIZE - 1];
+    int data_c [0:BUF_SIZE - 1];
 
     // Iteration variables used during calculation.
-    reg int idx_i, idx_j, idx_k, mac;
+    int idx_i, idx_j, idx_k, mac;
 
     always_ff @(posedge clk) begin
         // Local variables
-        reg int a_ik, b_kj;
+        int a_ik, b_kj;
         if (start) begin
             if (dims_a.rows * dims_a.cols < BUF_SIZE &&
                 dims_b.rows * dims_a.cols < BUF_SIZE &&
