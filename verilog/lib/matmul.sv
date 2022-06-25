@@ -50,6 +50,8 @@ module matmul #(parameter BUF_SIZE=1024) (
         if (start) begin
             if (dims_a.rows * dims_a.cols < BUF_SIZE &&
                 dims_b.rows * dims_a.cols < BUF_SIZE &&
+                dims_a.rows > 0 && dims_a.cols > 0 &&
+                dims_b.rows > 0 && dims_b.cols > 0 &&
                 dims_a.cols == dims_b.rows) begin
                 state <= READ;
                 cnt_a <= dims_a.cols * dims_a.rows;

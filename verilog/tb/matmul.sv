@@ -71,6 +71,16 @@ module matmul_tb();
     end
     endtask
 
+    task automatic assert_error; begin
+        start = 1;
+        tick;
+        assert(state == ERROR);
+        start = 0;
+        tick;
+        assert(state == IDLE);
+    end
+    endtask
+
     task automatic run_test(
         input string name_a,
         input string name_b,
@@ -128,26 +138,20 @@ module matmul_tb();
         tick;
 
         // Too large.
-        start = 1;
         dims_a = {int'(1000), int'(1000)};
         dims_b = {int'(1000), int'(1000)};
-        tick;
-        assert(state == ERROR);
-
-        start = 0;
-        tick;
-        assert(state == IDLE);
+        assert_error;
 
         // Dimension mismatch.
         dims_a = {int'(2), int'(3)};
         dims_b = {int'(4), int'(2)};
-        start = 1;
-        tick;
-        assert(state == ERROR);
+        assert_error;
 
-        start = 0;
-        tick;
-        assert(state == IDLE);
+        // Zeros
+        dims_a = {int'(0), int'(10)};
+        dims_b = {int'(10), int'(0)};
+        assert_error;
+
 
         // Now for real
         run_test(
