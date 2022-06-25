@@ -18,7 +18,7 @@ package body ieee754 is
         bexp := signed(f(30 downto 23));
         -- Zero check.
         if bexp = 0 then
-            return to_signed(0, 24);
+            return to_signed(0, 31);
         end if;
         bexp := bexp - 127;
         frac := "000000001" & signed(f(22 downto 0));
