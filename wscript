@@ -3,6 +3,8 @@ from pathlib import Path
 def configure(ctx):
     ctx.env['IVERILOG'] = ctx.find_program('iverilog')
     ctx.env['GHDL'] = ctx.find_program('ghdl')
+    ctx.env['VERILATOR'] = ctx.find_program('verilator')
+    ctx.env['MAKE'] = ctx.find_program('make')
 
 PATH_VERILOG = Path('verilog')
 PATH_VERILOG_TB = PATH_VERILOG / 'tb'
@@ -13,7 +15,7 @@ PATH_VHDL_TB = PATH_VHDL / 'tb'
 PATH_VHDL_LIB = PATH_VHDL / 'lib'
 
 def build_verilog_module(ctx, name):
-    target = PATH_VERILOG_TB / name
+    target = Path('iverilog') / name
     source = [PATH_VERILOG_TB / (name + '.sv'),
               PATH_VERILOG_LIB / (name + '.sv')]
     ctx(target = str(target),
@@ -35,8 +37,22 @@ def build_vhdl_testbench(ctx, name):
         source = map(str, source),
         rule = rule)
 
+def build_verilator_testbench(ctx, name):
+    dut_path = PATH_VERILOG_LIB / f'{name}.sv'
+    tb_path = PATH_VERILOG_TB / f'tb_{name}.cpp'
+    rule_fmt = ('${VERILATOR} --Mdir %s_dir --trace '
+                '--cc ${SRC[0]} --exe ${SRC[1]} --build -o ../${TGT}')
+    rule = rule_fmt % name
+
+    target = Path('verilator') / name
+    source = [dut_path, tb_path]
+    ctx(target = str(target),
+        source = map(str, source),
+        rule = rule)
+
 def build(ctx):
     build_verilog_module(ctx, 'counter')
     build_verilog_module(ctx, 'divider')
     build_verilog_module(ctx, 'matmul')
     build_vhdl_testbench(ctx, 'ieee754')
+    build_verilator_testbench(ctx, 'matmul')

@@ -1,11 +1,11 @@
 // Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
 typedef enum {
     IDLE, READ, CALCULATE, WRITE, ERROR
-} matmul_state_t;
+} matmul_state_t /*verilator public*/;
 typedef struct packed {
     int rows;
     int cols;
-} matmul_dims_t;
+} matmul_dims_t /*verilator public*/;
 function int max(int a, int b);
     return a > b ? a: b;
 endfunction
