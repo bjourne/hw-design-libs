@@ -18,7 +18,8 @@ module divider #(parameter WIDTH=4) (
     logic [WIDTH - 1:0] y1;
     logic [WIDTH - 1:0] q1, q1_next;
     logic [WIDTH:0] ac, ac_next;
-    logic [$clog2(WIDTH) - 1:0] i;
+    // Required by Verilator...
+    logic [$clog2(WIDTH):0] i;
 
     always_comb begin
         if (ac >= {1'b0,y1}) begin
