@@ -1,10 +1,10 @@
 -- Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
+library bjourne;
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-library work;
-use work.all;
-use work.ieee754.all;
+use bjourne.all;
+use bjourne.ieee754.all;
 
 entity tb_ieee754 is
 end tb_ieee754;
@@ -26,6 +26,7 @@ architecture beh of tb_ieee754 is
 begin
     process
     begin
+        -- float32_to_int32
         assert float32_to_int32(fp_p100) = 100;
         assert float32_to_int32(fp_n100) = -100;
         assert float32_to_int32(fp_1) = 1;
@@ -34,7 +35,10 @@ begin
         assert float32_to_int32(fp_120_000) = 120_000;
         assert float32_to_int32(fp_59_000_000) = 59_000_000;
         assert float32_to_int32(fp_n2bill) = -2_123_000_064;
-        assert false report "done" severity note;
+
+        -- int32_to_float32
+        assert int32_to_float32(to_signed(100, 32)) = X"42c80000";
+        assert false report "all tests passed" severity note;
         wait;
     end process;
 end beh;
