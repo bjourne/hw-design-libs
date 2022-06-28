@@ -23,7 +23,7 @@ def build_verilog_module(ctx, name):
         source = [str(s) for s in source],
         rule = '${IVERILOG} -g2012 -I ../verilog/lib ${SRC[0]} -o ${TGT}')
 
-def build_verilator_testbench(ctx, name):
+def build_verilator_tb(ctx, name):
     dut_path = PATH_VERILOG_LIB / f'{name}.sv'
     tb_path = PATH_VERILOG_TB / f'tb_{name}.cpp'
     rule_fmt = ('${VERILATOR} --Mdir %s_dir --trace '
@@ -37,29 +37,40 @@ def build_verilator_testbench(ctx, name):
         rule = rule)
 
 def build_vhdl_lib(ctx, source, lib_name):
-    rule = '${GHDL} -a --std=08 --work=%s ${SRC}' % lib_name
-    target = '%s-obj08.cf' % lib_name
-    ctx(target = target,
+    lib_file = '%s-obj08.cf' % lib_name
+    rule = 'rm -f ${TGT} && ${GHDL} -a --std=08 --work=%s ${SRC}' % lib_name
+    ctx(target = lib_file,
         source = map(str, source),
         rule = rule)
 
-def build_vhdl_tb(ctx, tb_name):
-    source = PATH_VHDL_TB / f'{tb_name}.vhdl'
-    target = PATH_VHDL_TB / tb_name
+def build_vhdl_objs(ctx, source, lib_name):
+    # Really annoying hackish hacks.
+    lib_file = '%s-obj08.cf' % lib_name
+    target = [f'{s.stem}.o' for s in source]
+    rule = '${GHDL} -a --std=08 %s' % ' '.join(
+        str(Path('..') / s) for s in source)
+    ctx(target = target,
+        source = list(map(str, source)) + [lib_file],
+        rule = rule)
 
-    rule = ' && '.join(['${GHDL} -a --std=08 ${SRC}',
-                        '${GHDL} -e --std=08 %s' % tb_name,
-                        'mv %s ${TGT}' % tb_name])
+def build_vhdl_tb(ctx, tb_name, lib_name):
+    source = [PATH_VHDL_TB / f'{tb_name}.vhdl',
+              '%s-obj08.cf' % lib_name,
+              '%s.o' % tb_name]
+    target = PATH_VHDL_TB / tb_name
+    rule = '${GHDL} -e --std=08 -o ${TGT} %s' % tb_name
     ctx(target = str(target),
-        source = str(source),
+        source = map(str, source),
         rule = rule)
 
 def build(ctx):
     build_verilog_module(ctx, 'counter')
     build_verilog_module(ctx, 'divider')
     build_verilog_module(ctx, 'matmul')
-    build_verilator_testbench(ctx, 'matmul')
+    build_verilator_tb(ctx, 'matmul')
     build_vhdl_lib(ctx,
                    PATH_VHDL_LIB.glob('*.vhdl'),
                    'bjourne')
-    build_vhdl_tb(ctx, 'tb_ieee754')
+    build_vhdl_objs(ctx, list(PATH_VHDL_TB.glob('*.vhdl')), 'bjourne')
+    build_vhdl_tb(ctx, 'tb_ieee754', 'bjourne')
+    build_vhdl_tb(ctx, 'tb_math', 'bjourne')
