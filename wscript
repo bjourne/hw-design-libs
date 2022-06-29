@@ -1,11 +1,17 @@
 # Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
 from pathlib import Path
+from subprocess import check_output
 
 def configure(ctx):
     ctx.env['IVERILOG'] = ctx.find_program('iverilog')
     ctx.env['GHDL'] = ctx.find_program('ghdl')
     ctx.env['VERILATOR'] = ctx.find_program('verilator')
     ctx.env['MAKE'] = ctx.find_program('make')
+
+    o = check_output([ctx.env['GHDL'][0], '--version'])
+    s = o.decode('utf-8').splitlines()[2]
+    obj_gen = not 'mcode' in s
+    ctx.env['GHDL_OBJ_GEN'] = obj_gen
 
 PATH_VERILOG = Path('verilog')
 PATH_VERILOG_TB = PATH_VERILOG / 'tb'
@@ -63,14 +69,28 @@ def build_vhdl_tb(ctx, tb_name, lib_name):
         source = map(str, source),
         rule = rule)
 
+def build_vhdl_tbs_no_gen(ctx, tb_paths, lib_name):
+    for tb_path in tb_paths:
+        source = [tb_path, '%s-obj08.cf' % lib_name]
+        rule = '${GHDL} -a --std=08 %s' % str(Path('..') / tb_path)
+        ctx(target = 'work-obj08.cf',
+            source = list(map(str, source)),
+            rule = rule)
+
 def build(ctx):
     build_verilog_module(ctx, 'counter')
     build_verilog_module(ctx, 'divider')
     build_verilog_module(ctx, 'matmul')
     build_verilator_tb(ctx, 'matmul')
-    build_vhdl_lib(ctx,
-                   PATH_VHDL_LIB.glob('*.vhdl'),
-                   'bjourne')
-    build_vhdl_objs(ctx, list(PATH_VHDL_TB.glob('*.vhdl')), 'bjourne')
-    build_vhdl_tb(ctx, 'tb_ieee754', 'bjourne')
-    build_vhdl_tb(ctx, 'tb_math', 'bjourne')
+
+    # GHDL stuff
+    vhdl_lib_files = list(PATH_VHDL_LIB.glob('*.vhdl'))
+    vhdl_tb_files = list(PATH_VHDL_TB.glob('*.vhdl'))
+
+    build_vhdl_lib(ctx, vhdl_lib_files, 'bjourne')
+    if ctx.env['GHDL_OBJ_GEN']:
+        build_vhdl_objs(ctx, vhdl_tb_files, 'bjourne')
+        build_vhdl_tb(ctx, 'tb_ieee754', 'bjourne')
+        build_vhdl_tb(ctx, 'tb_math', 'bjourne')
+    else:
+        build_vhdl_tbs_no_gen(ctx, vhdl_tb_files, 'bjourne')
