@@ -13,27 +13,36 @@ module divider_tb();
     end
     endtask
 
+    task automatic run_test(
+        input logic [WIDTH - 1:0] x0,
+        input logic [WIDTH - 1:0] y0,
+        input logic [WIDTH - 1:0] q0,
+        input logic [WIDTH - 1:0] r0
+    ); begin
+    end
+        start = 1;
+        x = x0;
+        y = y0;
+        tick;
+        start = 0;
+        repeat (WIDTH) tick;
+        assert (q == q0);
+        assert (r == r0);
+        assert (val == 1);
+    endtask
+
+
     initial begin
         $display ("time clk rst start  x  y  q  r val busy dbz");
         $monitor ("%3d    %b   %b     %b %3d %3d %3d %3d   %b    %b   %b",
   	          $time, clk, rst, start, x, y, q, r, val, busy, dbz);
+
         clk = 1;
         rst = 1;
         start = 0;
-
         tick;
 
-        start = 1;
-        x = 11;
-        y = 3;
-        tick;
-        start = 0;
-
-        repeat(WIDTH) tick;
-
-        assert (q == 3);
-        assert (r == 2);
-        assert (val == 1);
+        run_test(11, 3, 3, 2);
 
         start = 1;
         x = 10;
@@ -42,17 +51,10 @@ module divider_tb();
         assert (dbz == 1);
         assert (val == 0);
 
-        // We don't support negative numbers.
-        x = -8;
-        y = -2;
-        start = 1;
-        tick;
+        run_test(55, 11, 5, 0);
 
-        start = 0;
-        repeat(WIDTH) tick;
-        assert (val == 1);
-        assert (q == 0);
-        assert  (r == 248);
+        // We don't support negative numbers (yet).
+        run_test(-8, -2, 0, 248);
 
         #5 $finish;
     end

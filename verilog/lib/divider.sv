@@ -22,11 +22,12 @@ module divider #(parameter WIDTH=4) (
     logic [$clog2(WIDTH):0] i;
 
     always_comb begin
-        if (ac >= {1'b0,y1}) begin
-            ac_next = ac - y1;
-            {ac_next, q1_next} = {ac_next[WIDTH - 1:0], q1, 1'b1};
+        if (ac >= y1) begin
+            q1_next = (q1 << 1) | 1'b1;
+            ac_next = ((ac - y1) << 1) | q1[WIDTH - 1];
         end else begin
-            {ac_next, q1_next} = {ac, q1} << 1;
+            ac_next = (ac << 1) | q1[WIDTH - 1];
+            q1_next = q1 << 1;
         end
     end
 
@@ -34,14 +35,15 @@ module divider #(parameter WIDTH=4) (
         if (start) begin
             valid <= 0;
             i <= WIDTH - 1;
+            y1 <= y;
+            ac <= x[WIDTH - 1];
+            q1 <= x << 1;
             if (y == 0) begin
                 busy <= 0;
                 dbz <= 1;
             end else begin
                 busy <= 1;
                 dbz <= 0;
-                y1 <= y;
-                {ac, q1} <= {{WIDTH{1'b0}}, x, 1'b0};
             end
         end else if (busy) begin
             if (i == 0) begin
