@@ -42,6 +42,8 @@ module divider_tb();
         start = 0;
         tick;
 
+        run_test(128, 128, 1, 0);
+
         run_test(11, 3, 3, 2);
 
         start = 1;
