@@ -14,35 +14,20 @@ module divider #(parameter WIDTH=4) (
     output     logic [WIDTH-1:0] q,
     output     logic [WIDTH-1:0] r
 );
-    typedef struct packed {
-        logic [WIDTH - 1:0] q1;
-        logic [WIDTH:0] ac;
-    } regs_t;
-    function regs_t next_regs(
-        regs_t in,
-        logic [WIDTH - 1:0] y1
-    );
-        if (in.ac >= y1) begin
-            next_regs.q1 = (in.q1 << 1) | 1'b1;
-            next_regs.ac = ((in.ac - y1) << 1) | in.q1[WIDTH - 1];
-        end else begin
-            next_regs.q1 = in.q1 << 1;
-            next_regs.ac = (in.ac << 1) | in.q1[WIDTH - 1];
-        end
-    endfunction
-
     logic [WIDTH - 1:0] y1;
     logic [$clog2(WIDTH):0] i;
-    regs_t curr;
+    logic [WIDTH - 1:0] q1;
+    logic [WIDTH:0] ac;
 
     always_ff @(posedge clk) begin
-        regs_t next;
+        logic [WIDTH - 1:0] q1_next;
+        logic [WIDTH:0] ac_next;
         if (start) begin
             valid <= 0;
             i <= WIDTH - 1;
             y1 <= y;
-            curr.ac <= x[WIDTH - 1];
-            curr.q1 <= x << 1;
+            ac <= x[WIDTH - 1];
+            q1 <= x << 1;
             if (y == 0) begin
                 busy <= 0;
                 dbz <= 1;
@@ -51,15 +36,22 @@ module divider #(parameter WIDTH=4) (
                 dbz <= 0;
             end
         end else if (busy) begin
-            next = next_regs(curr, y1);
+            if (ac >= y1) begin
+                q1_next = (q1 << 1) | 1'b1;
+                ac_next = ((ac - y1) << 1) | q1[WIDTH - 1];
+            end else begin
+                q1_next = q1 << 1;
+                ac_next = (ac << 1) | q1[WIDTH - 1];
+            end
             if (i == 0) begin
                 busy <= 0;
                 valid <= 1;
-                q <= next.q1;
-                r <= next.ac[WIDTH:1];
+                q <= q1_next;
+                r <= ac_next[WIDTH:1];
             end else begin
                 i <= i - 1;
-                curr = next;
+                q1 <= q1_next;
+                ac <= ac_next;
             end
         end
     end
