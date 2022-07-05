@@ -80,6 +80,7 @@ def build_vhdl_tbs_no_gen(ctx, tb_paths, lib_name):
 def build(ctx):
     build_verilog_module(ctx, 'counter')
     build_verilog_module(ctx, 'divider')
+    build_verilog_module(ctx, 'gcd')
     build_verilog_module(ctx, 'matmul')
     build_verilator_tb(ctx, 'matmul')
 
