@@ -1,10 +1,10 @@
 module {{ mod_name }} ({{ inouts|join(', ') }});
     // Input/output declarations
     {%- for n, ar in ins %}
-    {{ render_lval('input', n, ar) }};
+    {{ render_lval('input', None, n, ar) }};
     {%- endfor %}
     {%- for n, ar in outs %}
-    {{ render_lval('output', n, ar) }};
+    {{ render_lval('output', None, n, ar) }};
     {%- endfor %}
 
     // Flip-flop assignments
@@ -17,11 +17,11 @@ module {{ mod_name }} ({{ inouts|join(', ') }});
 
     // Internal wires
     {%- for (n, tp, ar), args in internal_wires %}
-    {{ render_lval('wire', n, ar) }} = {{ render_rval(tp, args) }};
+    {{ render_lval('wire', tp, n, ar) }} = {{ render_rval(tp, args) }};
     {%- endfor %}
 
     // Output wires
     {%- for (n, tp, ar), args in output_wires %}
-    {{ render_lval('wire', n, ar) }} = {{ render_rval(tp, args) }};
+    {{ render_lval('wire', tp, n, ar) }} = {{ render_rval(tp, args) }};
     {%- endfor %}
 endmodule

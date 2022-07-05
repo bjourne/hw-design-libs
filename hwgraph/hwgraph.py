@@ -14,8 +14,10 @@ def render_tmpl_to_file(tmpl_name, file_path, **kwargs):
     with open(file_path, 'wt') as of:
         of.write(txt + '\n')
 
-def render_lval(lval_tp, name, arity):
-    print('rendering', name)
+def render_lval(lval_tp, tp, name, arity):
+    if tp == 'mux2_2':
+        arity = 2*arity
+    #print('rendering', name)
     arity = f'[{arity-1}:0]'
     return f'{lval_tp} {arity} {name}'
 
@@ -44,6 +46,11 @@ def render_rval(tp, args):
         return '!' + args[0][1]
     elif tp == 'mux2':
         return '%s ? %s : %s' % (args[0][1], args[1][1], args[2][1])
+    elif tp == 'mux2_2':
+        return '%s ? {%s, %s} : {%s, %s}' % (
+            args[0][1], args[1][1], args[2][1], args[3][1], args[4][1])
+        #print(tp, args)
+
     assert False
 
 def input_nodes(V):
@@ -109,11 +116,7 @@ def render_verilog_tb(V, E, mod_name, clk_n_rstn):
 
 
     ranges = [list(range(2**ar)) for (_, ar) in ins]
-
     assignments = list(product(*ranges))
-
-
-
     kw = {
         'mod_name' : mod_name,
 
@@ -154,7 +157,7 @@ def style_node(n, tp, ar):
     elif tp in ('input', 'output'):
         shape = 'oval'
         label = f'{n}[{ar}]'
-    elif tp == 'mux2':
+    elif tp in ('mux2', 'mux2_2'):
         shape = 'diamond'
         label = tp
     elif tp == 'flip-flop':
@@ -176,6 +179,11 @@ def style_edge(n1, tp1, ar1, n2, tp2, ar2, pf, pt):
         if pt == 1:
             color = '#00aa00'
         elif pt == 2:
+            color = '#aa0000'
+    elif tp2 == 'mux2_2':
+        if pt in (1, 2):
+            color = '#00aa00'
+        elif pt in (3, 4):
             color = '#aa0000'
     elif tp2 == 'flip-flop':
         if pt == 0:
@@ -294,8 +302,10 @@ def main():
         'x_next2' : ('mux2', 8),
         'y_next2' : ('mux2', 8),
 
-        'x_next3' : ('mux2', 8),
-        'y_next3' : ('mux2', 8),
+        # 'x_next3' : ('mux2', 8),
+        # 'y_next3' : ('mux2', 8),
+
+        'next3' : ('mux2_2', 8),
 
         'p' : ('flip-flop', 1),
         'x' : ('flip-flop', 8),
@@ -340,23 +350,32 @@ def main():
 
         # x_next2
         ('p', 'x_next2', 0, 0),
-        ('x_next3', 'x_next2', 0, 1),
+        #('x_next3', 'x_next2', 0, 1),
+        ('next3', 'x_next2', 0, 1),
         ('x', 'x_next2', 0, 2),
 
         # x_next3
-        ('x_ge_y', 'x_next3', 0, 0),
-        ('y', 'x_next3', 0, 1),
-        ('x', 'x_next3', 0, 2),
+        ('x_ge_y', 'next3', 0, 0),
+
+        # two positive inputs
+        ('y', 'next3', 0, 1),
+        ('x', 'next3', 0, 2),
+
+        # two negative
+        ('x', 'next3', 0, 3),
+        ('y_sub_x', 'next3', 0, 4),
+
 
         # y_next2
         ('p', 'y_next2', 0, 0),
-        ('y_next3', 'y_next2', 0, 1),
+        #('y_next3', 'y_next2', 0, 1),
+        ('next3', 'y_next2', 1, 1),
         ('y', 'y_next2', 0, 2),
 
-        # y_next3
-        ('x_ge_y', 'y_next3', 0, 0),
-        ('x', 'y_next3', 0, 1),
-        ('y_sub_x', 'y_next3', 0, 2),
+        # # y_next3
+        # ('x_ge_y', 'y_next3', 0, 0),
+        # ('x', 'y_next3', 0, 1),
+        # ('y_sub_x', 'y_next3', 0, 2),
 
 
         # Connect next muxes
@@ -382,7 +401,7 @@ def main():
         ('y_eq_0_and_p', 'out_valid', 0, 0),
         ('x', 'o', 0, 0)
     }
-    # render_verilog(V, E, 'test01')
+    render_verilog(V, E, 'test01')
     # render_verilog_tb(V, E, 'test01', ('clk', 'rstn'))
     plot_hw_graph(V, E, 'test01', False)
 
