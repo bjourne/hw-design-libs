@@ -286,31 +286,25 @@ def main():
         'c8_8' : ('const_8', 8),
         'c15_8' : ('const_15', 8),
 
-        # P state
         'p' : ('flip-flop', 1),
+        'xy' : ('flip-flop', 16),
 
         # Combinatorial
         'begin_p' : ('and', 1),
+        'y_eq_0_and_p' : ('and', 1),
         'not_p' : ('not', 1),
+        'not_rstn' : ('not', 1),
 
         # Muxes
         'p_next' : ('mux2', 1),
         'p_next2' : ('mux2', 1),
         'p_next3' : ('mux2', 1),
-
-        'not_rstn' : ('not', 1),
+        'next' : ('mux2', 16),
+        'next3' : ('mux2', 16),
 
         'x_ge_y' : ('ge', 1),
         'y_eq_0' : ('eq', 1),
         'y_sub_x' : ('sub', 8),
-
-        'y_eq_0_and_p' : ('and', 1),
-
-
-        'next' : ('mux2', 16),
-        'next3' : ('mux2', 16),
-
-        'xy' : ('flip-flop', 16),
 
         'cat_ab' : ('cat', 16),
         'cat_yx' : ('cat', 16),
