@@ -3,6 +3,7 @@ from itertools import groupby, product
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, Template
 from pathlib import Path
 from pygraphviz import AGraph
+from random import shuffle
 
 TMPL_PATH = Path(__file__).parent / 'templates'
 ENV = Environment(loader = FileSystemLoader(TMPL_PATH),
@@ -24,6 +25,7 @@ tp_to_binop = {
 }
 
 WIRE_OWNERS = {'mux2', 'input', 'output', 'flip-flop'}
+OUTPUT = Path('output')
 
 def render_lval(lval_tp, tp, name, arity):
     arity = f'[{arity-1}:0]'
@@ -78,7 +80,7 @@ def sort_groupby(seq, keyfun, valfun):
         d[keyfun(el)].add(valfun(el))
     return [(k, sorted(v)) for k, v in sorted(d.items())]
 
-def render_verilog(V, E, pred, mod_name):
+def render_verilog(V, E, pred, mod_name, dir):
     keyfun, elfun = lambda x: x[1], lambda x: x[0]
     ins = input_nodes(V)
     gr_ins = sort_groupby(ins, keyfun, elfun)
@@ -122,17 +124,23 @@ def render_verilog(V, E, pred, mod_name):
         'mod_name' : mod_name,
         'WIRE_OWNERS' : WIRE_OWNERS
     }
-    render_tmpl_to_file('module.v', f'{mod_name}.v', **kwargs)
+    render_tmpl_to_file('module.v', dir / f'{mod_name}.v', **kwargs)
 
-def render_verilog_tb(V, E, mod_name, clk_n_rstn):
-    def fmt_arity(ar):
-        return '%5b' if ar == 1 else '%5d'
+def render_verilog_tb(V, E, tests, mod_name, clk_n_rstn, dir):
+    def fmt_arity(n, ar):
+        size = max(5, len(n))
+        ind = 'b' if ar == 1  else 'd'
+        return f'%{size}{ind}'
 
+    keyfun, elfun = lambda x: x[1], lambda x: x[0]
     ins = input_nodes(V)
+    gr_ins = sort_groupby(ins, keyfun, elfun)
+
     outs = output_nodes(V)
+    gr_outs = sort_groupby(outs, keyfun, elfun)
     inouts = ins + outs
 
-    value_fmts = [fmt_arity(ar) for (n, ar) in inouts]
+    value_fmts = [fmt_arity(*io) for io in inouts]
     header_fmts = ['%5s' for _ in inouts]
     names = [n for (n, ar) in inouts]
     quoted_names = [f'"{n}"' for n in names]
@@ -142,9 +150,12 @@ def render_verilog_tb(V, E, mod_name, clk_n_rstn):
     assignments = list(product(*ranges))
     kw = {
         'mod_name' : mod_name,
+        'tests' : tests,
 
         'ins' : ins,
         'outs' : outs,
+        'gr_ins' : gr_ins,
+        'gr_outs' : gr_outs,
 
         'value_fmts' : value_fmts,
         'header_fmts' : header_fmts,
@@ -160,7 +171,7 @@ def render_verilog_tb(V, E, mod_name, clk_n_rstn):
         # Rendering functions
         'render_lval' : render_lval
     }
-    render_tmpl_to_file('tb.v', f'{mod_name}_tb.v', **kw)
+    render_tmpl_to_file('tb.v', dir / f'{mod_name}_tb.v', **kw)
 
 def style_node(n, tp, ar):
     shape = 'box'
@@ -176,7 +187,7 @@ def style_node(n, tp, ar):
     elif tp in tp_to_binop:
         label = tp_to_binop[tp]
     elif tp == 'slice':
-
+        label = 'slice'
     elif tp == 'not':
         label = '!'
     elif tp in ('input', 'output'):
@@ -221,7 +232,7 @@ def style_edge(n1, tp1, ar1, n2, tp2, ar2, pf, pt):
         'penwidth' : penwidth
         }
 
-def plot_hw_graph(V, E, mod_name, draw_clk):
+def plot_hw_graph(V, E, mod_name, draw_clk, dir):
     G = AGraph(strict = False, directed = True)
     graph_attrs = {
         'dpi' : 300,
@@ -255,9 +266,7 @@ def plot_hw_graph(V, E, mod_name, draw_clk):
         if n1 != 'clk' or draw_clk:
             G.add_edge(n1, n2, **attrs)
 
-
-    file_path = f'{mod_name}.png'
-    G.draw(file_path, prog='dot')
+    G.draw(dir / f'{mod_name}.png', prog='dot')
 
 def main():
     V = {
@@ -406,12 +415,58 @@ def main():
 
     pred = {k : [v2 for _, v2 in sorted(v)]
             for (k, v) in pred.items()}
-    print(pred)
+    OUTPUT.mkdir(exist_ok = True)
 
 
-    render_verilog(V, E, pred, 'test01')
-    #render_verilog_tb(V, E, 'test01', ('clk', 'rstn'))
-    plot_hw_graph(V, E, 'test01', False)
+    tests = [
+        {
+            'name' : 'Ready after reset',
+            'setup' : [
+                ({
+                    'rstn' : 0
+                }, 1)
+            ],
+            'post' : {'in_ready' : 1},
+        },
+        {
+            'name' : 'Propagate a to o',
+            'setup' : [
+                ({
+                    'rstn' : 0
+                }, 1),
+                ({
+                    'rstn' : 1,
+                    'in_valid' : 1,
+                    'a' : 5,
+                    'b' : 2
+                }, 1)
+            ],
+            'post' : {'o' : 5}
+        },
+        {
+            'name' : 'Read only one tick',
+            'setup' : [
+                ({
+                    'rstn' : 0
+                }, 1),
+                ({
+                    'rstn' : 1,
+                    'in_valid' : 1,
+                    'a' : 5,
+                    'b' : 2
+                }, 1),
+                ({
+                    'a' : 22
+                }, 1)
+            ],
+            'post' : {'o' : 2}
+        }
+    ]
+    shuffle(tests)
+
+    render_verilog(V, E, pred, 'test01', OUTPUT)
+    render_verilog_tb(V, E, tests, 'test01', ('clk', 'rstn'), OUTPUT)
+    plot_hw_graph(V, E, 'test01', False, OUTPUT)
 
 
 

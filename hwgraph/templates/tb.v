@@ -1,14 +1,15 @@
 `include "{{ mod_name }}.v"
 module {{ mod_name }}_tb();
-    {%- for n, ar in ins %}
-    {{ render_lval('reg', None, n, ar) }};
+    // Input/output declarations
+    {%- for ar, grp in gr_ins %}
+    reg [{{ ar - 1 }}:0] {{ ', '.join(grp) }};
     {%- endfor %}
-    {%- for n, ar in outs %}
-    {{ render_lval('wire', None, n, ar) }};
+    {%- for ar, grp in gr_outs %}
+    wire [{{ ar - 1 }}:0] {{ ', '.join(grp) }};
     {%- endfor %}
 
     {%- if clk_n_rstn %}
-    {%- set clk = clk_n_rstn[0] %}
+    {%- set clk, rstn = clk_n_rstn %}
     task tick; begin
         #5 {{ clk }} = ~{{ clk }};
         #5 {{ clk }} = ~{{ clk }};
@@ -20,14 +21,22 @@ module {{ mod_name }}_tb();
         );
         $monitor("{{ value_fmts|join(' ') }}", {{ names|join(', ') }});
         {% if clk_n_rstn %}
-        {%- set rstn = clk_n_rstn[1] %}
-        // Probably safe to clear all input variables.
-        {%- for n, ar in ins %}
-        {{ n }} = 0;
+
+        {{ clk }} = 0;
+
+        {%- for tc in tests %}
+        $display("=== TC: %s ===", "{{ tc['name'] }}");
+        {%- for vars, delta in tc['setup'] %}
+        {%- for k, v in vars.items() %}
+        {{ k }} = {{ v }};
         {%- endfor %}
-        tick;
-        {{ rstn }} = 1;
-        repeat (10) tick;
+        repeat  ({{ delta }}) tick;
+        {%- endfor %}
+        {%- for k, v in tc['post'].items() %}
+        assert({{ k }} == {{ v }});
+        {%- endfor %}
+        {%- endfor %}
+
         {%- else %}
         {%- for values in assignments %}
         #5 {%- for v, (n, _) in zip(values, ins) %} {{ n }} = {{ v }}; {%- endfor %}
