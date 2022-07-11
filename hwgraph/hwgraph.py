@@ -1,4 +1,5 @@
-from itertools import product
+from collections import defaultdict
+from itertools import groupby, product
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, Template
 from pathlib import Path
 from pygraphviz import AGraph
@@ -6,21 +7,11 @@ from pygraphviz import AGraph
 TMPL_PATH = Path(__file__).parent / 'templates'
 ENV = Environment(loader = FileSystemLoader(TMPL_PATH),
                   undefined = StrictUndefined)
-ENV.globals.update(zip = zip)
-
 def render_tmpl_to_file(tmpl_name, file_path, **kwargs):
     tmpl = ENV.get_template(tmpl_name)
     txt = tmpl.render(**kwargs)
     with open(file_path, 'wt') as of:
         of.write(txt + '\n')
-
-def render_lval(lval_tp, tp, name, arity):
-    if tp == 'mux2_2':
-        arity = 2*arity
-    #print('rendering', name)
-    arity = f'[{arity-1}:0]'
-    return f'{lval_tp} {arity} {name}'
-
 
 tp_to_binop = {
     'and' : '&',
@@ -32,26 +23,46 @@ tp_to_binop = {
     'add' : '+'
 }
 
-def render_rval(tp, args):
-    binop = tp_to_binop.get(tp)
-    if binop:
-        return f'{args[0][1]} {binop} {args[1][1]}'
-    if tp == 'output':
-        return args[0][1]
-    elif tp == 'const_1':
-        return '1'
-    elif tp == 'const_0':
-        return '0'
-    elif tp == 'not':
-        return '!' + args[0][1]
-    elif tp == 'mux2':
-        return '%s ? %s : %s' % (args[0][1], args[1][1], args[2][1])
-    elif tp == 'mux2_2':
-        return '%s ? {%s, %s} : {%s, %s}' % (
-            args[0][1], args[1][1], args[2][1], args[3][1], args[4][1])
-        #print(tp, args)
+WIRE_OWNERS = {'mux2', 'input', 'output', 'flip-flop'}
 
+def render_lval(lval_tp, tp, name, arity):
+    arity = f'[{arity-1}:0]'
+    return f'{lval_tp} {arity} {name}'
+
+def render_rval(V, pred, n, outer):
+    tp, ar = V[n]
+    is_binop = tp in tp_to_binop
+    r_args = []
+    for n2 in pred.get(n, []):
+        r_arg = n2
+        if not V[n2][0] in WIRE_OWNERS:
+            r_arg = render_rval(V, pred, n2, outer and not is_binop)
+        r_args.append(r_arg)
+    if tp.startswith('const_'):
+        return tp[6:]
+    elif is_binop:
+        binop = tp_to_binop[tp]
+        s = f'{r_args[0]} {binop} {r_args[1]}'
+        if not outer:
+            s = f'({s})'
+        return s
+    elif tp == 'not':
+        return '!' + r_args[0]
+    elif tp == 'mux2':
+        return '%s\n        ? %s\n        : %s' % tuple(r_args)
+    elif tp == 'cat':
+        return '{%s, %s}' % tuple(r_args)
+    elif tp == 'slice':
+        return '%s[%s:%s]' % tuple(r_args)
+    elif tp in ('input', 'flip-flop'):
+        return n
+    elif tp == 'output':
+        return r_args[0]
     assert False
+
+ENV.globals.update(zip = zip,
+                   render_rval = render_rval,
+                   render_lval = render_lval)
 
 def input_nodes(V):
     ins = [(n, ar) for n, (tp, ar) in V.items() if tp == 'input']
@@ -61,43 +72,55 @@ def output_nodes(V):
     outs = [(n, ar) for n, (tp, ar) in V.items() if tp == 'output']
     return sorted(outs)
 
-def render_verilog(V, E, mod_name):
+def sort_groupby(seq, keyfun, valfun):
+    d = defaultdict(set)
+    for el in seq:
+        d[keyfun(el)].add(valfun(el))
+    return [(k, sorted(v)) for k, v in sorted(d.items())]
+
+def render_verilog(V, E, pred, mod_name):
+    keyfun, elfun = lambda x: x[1], lambda x: x[0]
     ins = input_nodes(V)
+    gr_ins = sort_groupby(ins, keyfun, elfun)
+
     outs = output_nodes(V)
+    gr_outs = sort_groupby(outs, keyfun, elfun)
 
     inouts = ins + outs
     inouts = [n for (n, ar) in inouts]
 
+    ffs_per_clk = defaultdict(set)
+    for ff, (tp, ar) in V.items():
+        if tp == 'flip-flop':
+            clk, wire = pred[ff]
+            ffs_per_clk[clk].add((ff, wire, ar))
+
     ffs = [((n, ar),
-            sorted([(pt, f) for (f, t, pf, pt) in E if t == n]))
+            sorted([f for (f, t, pf, pt) in E if t == n]))
            for n, (tp, ar) in V.items()
            if tp == 'flip-flop'
     ]
-    internal_wires = [
-        ((n, tp, ar),
-         sorted([(pt, f) for (f, t, pf, pt) in E if t == n]))
-        for (n, (tp, ar)) in V.items()
-        if tp not in ('input', 'output', 'flip-flop')
-    ]
-    output_wires = [
-        ((n, tp, ar),
-         sorted([(pt, f) for (f, t, pf, pt) in E if t == n]))
-        for (n, (tp, ar)) in V.items()
-        if tp == 'output'
-    ]
+
+    internal_wires = [(n, tp, ar) for (n, (tp, ar)) in V.items()
+                      if tp not in ('input', 'output', 'flip-flop')]
+    output_wires = [(n, tp, ar) for (n, (tp, ar)) in V.items()
+                    if tp == 'output']
 
     kwargs = {
         'inouts' : inouts,
-        'ins' : ins,
-        'outs' : outs,
+        'gr_ins' : gr_ins,
+        'gr_outs' : gr_outs,
+
         'internal_wires' :  internal_wires,
         'output_wires' : output_wires,
-        'ffs' : ffs,
-        'mod_name' : mod_name,
 
-        # Rendering functions
-        'render_lval' : render_lval,
-        'render_rval' : render_rval,
+        'pred' : pred,
+        'V' : V,
+
+        'ffs' : ffs,
+        'ffs_per_clk' : ffs_per_clk,
+        'mod_name' : mod_name,
+        'WIRE_OWNERS' : WIRE_OWNERS
     }
     render_tmpl_to_file('module.v', f'{mod_name}.v', **kwargs)
 
@@ -152,12 +175,14 @@ def style_node(n, tp, ar):
         label = f'{val}[{ar}]'
     elif tp in tp_to_binop:
         label = tp_to_binop[tp]
+    elif tp == 'slice':
+
     elif tp == 'not':
         label = '!'
     elif tp in ('input', 'output'):
         shape = 'oval'
         label = f'{n}[{ar}]'
-    elif tp in ('mux2', 'mux2_2'):
+    elif tp == 'mux2':
         shape = 'diamond'
         label = tp
     elif tp == 'flip-flop':
@@ -203,7 +228,6 @@ def plot_hw_graph(V, E, mod_name, draw_clk):
         'ranksep' : 0.4,
         'fontname' : 'Inconsolata',
         'bgcolor' : 'transparent',
-        #'splines' : 'ortho',
         'rainkdir' : 'LR'
     }
     G.graph_attr.update(graph_attrs)
@@ -236,38 +260,6 @@ def plot_hw_graph(V, E, mod_name, draw_clk):
     G.draw(file_path, prog='dot')
 
 def main():
-    # V = {'x' : ('input', 1),
-    #      'y' : ('input', 1),
-    #      'z' : ('output', 1),
-    #      'xy' : ('or', 1)
-    # }
-    # E = {
-    #     ('x', 'xy', 0, 0),
-    #     ('y', 'xy', 0, 1),
-    #     ('xy', 'z', 0, 0)
-    # }
-    # V = {
-    #     'clk' : ('input', 1),
-    #     'rstn' : ('input', 1),
-    #     'o' : ('output', 3),
-    #     'ff' : ('flip-flop', 3),
-    #     'c1' : ('const_1', 3),
-    #     'c0' : ('const_0', 3),
-    #     'cnt' : ('add', 3),
-    #     'sel' : ('not', 1),
-    #     'ff_next' : ('mux2', 3)
-    # }
-    # E = {
-    #     ('rstn', 'sel', 0, 0),
-    #     ('sel', 'ff_next', 0, 0),
-    #     ('c0', 'ff_next', 0, 1),
-    #     ('cnt', 'ff_next', 0, 2),
-    #     ('clk', 'ff', 0, 0),
-    #     ('ff_next', 'ff', 0, 1),
-    #     ('ff', 'o', 0, 0),
-    #     ('ff', 'cnt', 0, 0),
-    #     ('c1', 'cnt', 0, 1)
-    # }
     V = {
         'clk' : ('input', 1),
         'rstn' : ('input', 1),
@@ -281,6 +273,9 @@ def main():
 
         'c0_1' : ('const_0', 1),
         'c0_8' : ('const_0', 8),
+        'c7_8' : ('const_7', 8),
+        'c8_8' : ('const_8', 8),
+        'c15_8' : ('const_15', 8),
 
         'begin_p' : ('and', 1),
         'continue_p' : ('or', 1),
@@ -293,34 +288,53 @@ def main():
         'y_sub_x' : ('sub', 8),
 
         'y_eq_0_and_p' : ('and', 1),
-
-
         'p_next' : ('mux2', 1),
-        'x_next' : ('mux2', 8),
-        'y_next' : ('mux2', 8),
 
-        'x_next2' : ('mux2', 8),
-        'y_next2' : ('mux2', 8),
-
-        # 'x_next3' : ('mux2', 8),
-        # 'y_next3' : ('mux2', 8),
-
-        'next3' : ('mux2_2', 8),
+        'next' : ('mux2', 16),
+        'next2' : ('mux2', 16),
+        'next3' : ('mux2', 16),
 
         'p' : ('flip-flop', 1),
-        'x' : ('flip-flop', 8),
-        'y' : ('flip-flop', 8)
+        'xy' : ('flip-flop', 16),
+
+        'cat_ab' : ('cat', 16),
+        'cat_yx' : ('cat', 16),
+        'cat_x_y_sub_x' : ('cat', 16),
+
+        'sl_y_fr_xy' : ('slice', 8),
+        'sl_x_fr_xy' : ('slice', 8)
     }
     E = {
+
+        # Slicing
+        ('xy', 'sl_y_fr_xy', 0, 0),
+        ('c7_8', 'sl_y_fr_xy', 0, 1),
+        ('c0_8', 'sl_y_fr_xy', 0, 2),
+
+        ('xy', 'sl_x_fr_xy', 0, 0),
+        ('c15_8', 'sl_x_fr_xy', 0, 1),
+        ('c8_8', 'sl_x_fr_xy', 0, 2),
+
         # Clock connections
         ('clk', 'p', 0, 0),
-        ('clk', 'x', 0, 0),
-        ('clk', 'y', 0, 0),
+        ('clk', 'xy', 0, 0),
 
         # Connect registers
         ('p_next', 'p', 0, 1),
-        ('x_next', 'x', 0, 1),
-        ('y_next', 'y', 0, 1),
+        ('next', 'xy', 0, 1),
+        # ('x_next', 'x', 0, 1),
+        # ('y_next', 'y', 0, 1),
+
+        # Concatenate
+        ('sl_y_fr_xy', 'cat_yx', 0, 0),
+        ('sl_x_fr_xy', 'cat_yx', 0, 1),
+        # ('x', 'cat_xy', 0, 0),
+        # ('y', 'cat_xy', 0, 1),
+        ('a', 'cat_ab', 0, 0),
+        ('b', 'cat_ab', 0, 1),
+
+        ('sl_x_fr_xy', 'cat_x_y_sub_x', 0, 0),
+        ('y_sub_x', 'cat_x_y_sub_x', 0, 1),
 
         # not_p
         ('p', 'not_p', 0, 0),
@@ -330,79 +344,73 @@ def main():
 
         # begin_p
         ('in_valid', 'begin_p', 0, 0),
-        ('not_p', 'begin_p', 0, 0),
+        ('not_p', 'begin_p', 0, 1),
 
         # continue_p
         ('p', 'continue_p', 0, 0),
         ('in_valid', 'continue_p', 0, 0),
 
         # x_ge_y
-        ('x', 'x_ge_y', 0, 0),
-        ('y', 'x_ge_y', 0, 1),
+        ('sl_x_fr_xy', 'x_ge_y', 0, 0),
+        ('sl_y_fr_xy', 'x_ge_y', 0, 1),
 
         # y_eq_0
-        ('y', 'y_eq_0', 0, 0),
+        ('sl_y_fr_xy', 'y_eq_0', 0, 0),
         ('c0_8', 'y_eq_0', 0, 1),
 
         # y_sub_x
-        ('y', 'y_sub_x', 0, 0),
-        ('x', 'y_sub_x', 0, 1),
+        ('sl_y_fr_xy', 'y_sub_x', 0, 0),
+        ('sl_x_fr_xy', 'y_sub_x', 0, 1),
 
-        # x_next2
-        ('p', 'x_next2', 0, 0),
-        #('x_next3', 'x_next2', 0, 1),
-        ('next3', 'x_next2', 0, 1),
-        ('x', 'x_next2', 0, 2),
+        # next
+        ('begin_p', 'next', 0, 0),
+        ('cat_ab', 'next', 0, 1),
+        ('next2', 'next', 0, 2),
 
-        # x_next3
+        # next3
         ('x_ge_y', 'next3', 0, 0),
+        ('cat_yx', 'next3', 0, 1),
+        ('cat_x_y_sub_x', 'next3', 0, 2),
 
-        # two positive inputs
-        ('y', 'next3', 0, 1),
-        ('x', 'next3', 0, 2),
+        # next2
+        ('p', 'next2', 0, 0),
+        ('next3', 'next2', 0, 1),
+        ('xy', 'next2', 0, 2),
 
-        # two negative
-        ('x', 'next3', 0, 3),
-        ('y_sub_x', 'next3', 0, 4),
-
-
-        # y_next2
-        ('p', 'y_next2', 0, 0),
-        #('y_next3', 'y_next2', 0, 1),
-        ('next3', 'y_next2', 1, 1),
-        ('y', 'y_next2', 0, 2),
-
-        # # y_next3
-        # ('x_ge_y', 'y_next3', 0, 0),
-        # ('x', 'y_next3', 0, 1),
-        # ('y_sub_x', 'y_next3', 0, 2),
-
+        # next
+        ('begin_p', 'next', 0, 0),
+        ('cat_ab', 'next', 0, 1),
+        ('next2', 'next', 0, 2),
 
         # Connect next muxes
         ('not_rstn', 'p_next', 0, 0),
         ('c0_1', 'p_next', 0, 1),
         ('continue_p', 'p_next', 0, 2),
 
-        ('begin_p', 'x_next', 0, 0),
-        ('a', 'x_next', 0, 1),
-        ('x_next2', 'x_next', 0, 2),
-
-        ('begin_p', 'y_next', 0, 0),
-        ('b', 'y_next', 0, 1),
-        ('y_next2', 'y_next', 0, 2),
-
         # Stuff for p
         ('not_p', 'in_ready', 0, 0),
-
 
         # Other stuff
         ('y_eq_0', 'y_eq_0_and_p', 0, 0),
         ('p', 'y_eq_0_and_p', 0, 1),
         ('y_eq_0_and_p', 'out_valid', 0, 0),
-        ('x', 'o', 0, 0)
+        ('sl_x_fr_xy', 'o', 0, 0)
     }
-    render_verilog(V, E, 'test01')
-    # render_verilog_tb(V, E, 'test01', ('clk', 'rstn'))
+
+    # Create pred and succ
+    succ = defaultdict(set)
+    pred = defaultdict(set)
+    for v1, v2, pf, pt in E:
+        succ[v1].add((pf, v2))
+        pred[v2].add((pt, v1))
+
+    pred = {k : [v2 for _, v2 in sorted(v)]
+            for (k, v) in pred.items()}
+    print(pred)
+
+
+    render_verilog(V, E, pred, 'test01')
+    #render_verilog_tb(V, E, 'test01', ('clk', 'rstn'))
     plot_hw_graph(V, E, 'test01', False)
 
 

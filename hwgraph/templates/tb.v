@@ -1,10 +1,10 @@
 `include "{{ mod_name }}.v"
 module {{ mod_name }}_tb();
     {%- for n, ar in ins %}
-    {{ render_lval('reg', n, ar) }};
+    {{ render_lval('reg', None, n, ar) }};
     {%- endfor %}
     {%- for n, ar in outs %}
-    {{ render_lval('wire', n, ar) }};
+    {{ render_lval('wire', None, n, ar) }};
     {%- endfor %}
 
     {%- if clk_n_rstn %}

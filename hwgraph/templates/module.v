@@ -1,27 +1,35 @@
 module {{ mod_name }} ({{ inouts|join(', ') }});
     // Input/output declarations
-    {%- for n, ar in ins %}
-    {{ render_lval('input', None, n, ar) }};
+    {%- for ar, grp in gr_ins %}
+    input [{{ ar - 1 }}:0] {{ ', '.join(grp) }};
     {%- endfor %}
-    {%- for n, ar in outs %}
-    {{ render_lval('output', None, n, ar) }};
+    {%- for ar, grp in gr_outs %}
+    output [{{ ar - 1 }}:0] {{ ', '.join(grp) }};
     {%- endfor %}
 
     // Flip-flop assignments
-    {%- for (n, ar), args in ffs %}
+    {%- for clk, ffs in ffs_per_clk.items() %}
+    {%- for n, wire, ar in ffs %}
     reg [{{ ar - 1 }}:0] {{ n }};
-    always @(posedge {{ args[0][1] }}) begin
-        {{ n }} <= {{ args[1][1] }};
+    {%- endfor %}
+    {%- endfor %}
+    {%- for clk, ffs in ffs_per_clk.items() %}
+    always @(posedge {{ clk }}) begin
+        {%- for n, wire, ar in ffs %}
+        {{ n }} <= {{ wire }};
+        {%- endfor %}
     end
     {%- endfor %}
 
     // Internal wires
-    {%- for (n, tp, ar), args in internal_wires %}
-    {{ render_lval('wire', tp, n, ar) }} = {{ render_rval(tp, args) }};
+    {%- for n, tp, ar in internal_wires %}
+    {%- if tp in WIRE_OWNERS %}
+    {{ render_lval('wire', tp, n, ar) }} = {{ render_rval(V, pred, n, True) }};
+    {%- endif %}
     {%- endfor %}
 
     // Output wires
-    {%- for (n, tp, ar), args in output_wires %}
-    {{ render_lval('wire', tp, n, ar) }} = {{ render_rval(tp, args) }};
+    {%- for n, tp, ar in output_wires %}
+    {{ render_lval('wire', tp, n, ar) }} = {{ render_rval(V, pred, n, True) }};
     {%- endfor %}
 endmodule
