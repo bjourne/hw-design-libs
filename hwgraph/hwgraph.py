@@ -80,7 +80,7 @@ def sort_groupby(seq, keyfun, valfun):
         d[keyfun(el)].add(valfun(el))
     return [(k, sorted(v)) for k, v in sorted(d.items())]
 
-def render_verilog(V, E, pred, mod_name, dir):
+def render_verilog(V, pred, mod_name, dir):
     keyfun, elfun = lambda x: x[1], lambda x: x[0]
     ins = input_nodes(V)
     gr_ins = sort_groupby(ins, keyfun, elfun)
@@ -97,12 +97,8 @@ def render_verilog(V, E, pred, mod_name, dir):
             clk, wire = pred[ff]
             ffs_per_clk[clk].add((ff, wire, ar))
 
-    ffs = [((n, ar),
-            sorted([f for (f, t, pf, pt) in E if t == n]))
-           for n, (tp, ar) in V.items()
-           if tp == 'flip-flop'
-    ]
-
+    ffs = [((k, V[k][1]), v) for k, v in pred.items()
+           if V[k][0] == 'flip-flop']
     internal_wires = [(n, tp, ar) for (n, (tp, ar)) in V.items()
                       if tp not in ('input', 'output', 'flip-flop')]
     output_wires = [(n, tp, ar) for (n, (tp, ar)) in V.items()
@@ -126,7 +122,7 @@ def render_verilog(V, E, pred, mod_name, dir):
     }
     render_tmpl_to_file('module.v', dir / f'{mod_name}.v', **kwargs)
 
-def render_verilog_tb(V, E, tests, mod_name, clk_n_rstn, dir):
+def render_verilog_tb(V, tests, mod_name, clk_n_rstn, dir):
     def fmt_arity(n, ar):
         size = max(5, len(n))
         ind = 'b' if ar == 1  else 'd'
@@ -140,7 +136,6 @@ def render_verilog_tb(V, E, tests, mod_name, clk_n_rstn, dir):
     gr_outs = sort_groupby(outs, keyfun, elfun)
     inouts = ins + outs
 
-
     monitor_params = [('cycle', 16)] + [(n, ar) for n, ar in inouts
                                         if n not in clk_n_rstn[0]]
 
@@ -149,10 +144,8 @@ def render_verilog_tb(V, E, tests, mod_name, clk_n_rstn, dir):
     display_fmt = ' '.join('%5s' for n, _ in monitor_params)
     display_args = ', '.join(f'"{n}"' for n, _ in monitor_params)
 
-
     names = [n for (n, ar) in inouts]
     quoted_names = [f'"{n}"' for n in names]
-
 
     ranges = [list(range(2**ar)) for (_, ar) in ins]
     assignments = list(product(*ranges))
@@ -227,11 +220,6 @@ def style_edge(n1, tp1, ar1, n2, tp2, ar2, pf, pt):
             color = '#00aa00'
         elif pt == 2:
             color = '#aa0000'
-    elif tp2 == 'mux2_2':
-        if pt in (1, 2):
-            color = '#00aa00'
-        elif pt in (3, 4):
-            color = '#aa0000'
     elif tp2 == 'flip-flop':
         if pt == 0:
             style = 'dashed'
@@ -243,7 +231,7 @@ def style_edge(n1, tp1, ar1, n2, tp2, ar2, pf, pt):
         'penwidth' : penwidth
         }
 
-def plot_hw_graph(V, E, mod_name, draw_clk, dir):
+def plot_hw_graph(V, pred, mod_name, draw_clk, dir):
     G = AGraph(strict = False, directed = True)
     graph_attrs = {
         'dpi' : 300,
@@ -271,12 +259,12 @@ def plot_hw_graph(V, E, mod_name, draw_clk, dir):
         if n != 'clk' or draw_clk:
             G.add_node(n, **attrs)
 
-    for n1, n2, pf, pt in E:
-        (tp1, ar1), (tp2, ar2) = V[n1], V[n2]
-        attrs = style_edge(n1, tp1, ar1, n2, tp2, ar2, pf, pt)
-        if n1 != 'clk' or draw_clk:
-            G.add_edge(n1, n2, **attrs)
-
+    for n2, values in pred.items():
+        for pt, n1 in enumerate(values):
+            (tp1, ar1), (tp2, ar2) = V[n1], V[n2]
+            attrs = style_edge(n1, tp1, ar1, n2, tp2, ar2, None, pt)
+            if n1 != 'clk' or draw_clk:
+                G.add_edge(n1, n2, **attrs)
     G.draw(dir / f'{mod_name}.png', prog='dot')
 
 def main():
@@ -310,9 +298,6 @@ def main():
         'p_next2' : ('mux2', 1),
         'p_next3' : ('mux2', 1),
 
-        #'continue_p' : ('or', 1),
-
-        # 'not_p' : ('not', 1),
         'not_rstn' : ('not', 1),
 
         'x_ge_y' : ('ge', 1),
@@ -334,108 +319,52 @@ def main():
         'sl_y_fr_xy' : ('slice', 8),
         'sl_x_fr_xy' : ('slice', 8)
     }
-    E = {
-        # Slicing
-        ('xy', 'sl_y_fr_xy', 0, 0),
-        ('c7_8', 'sl_y_fr_xy', 0, 1),
-        ('c0_8', 'sl_y_fr_xy', 0, 2),
 
-        ('xy', 'sl_x_fr_xy', 0, 0),
-        ('c15_8', 'sl_x_fr_xy', 0, 1),
-        ('c8_8', 'sl_x_fr_xy', 0, 2),
 
-        # Clock connections
-        ('clk', 'p', 0, 0),
-        ('clk', 'xy', 0, 0),
+    # This structure implies that nodes only have a single logical
+    # output. Might have to change in the future...
+    pred = {
+        # Slices
+        'sl_y_fr_xy' : ['xy', 'c7_8', 'c0_8'],
+        'sl_x_fr_xy' : ['xy', 'c15_8', 'c8_8'],
 
-        # Connect registers
-        ('p_next', 'p', 0, 1),
-        ('next', 'xy', 0, 1),
-        # ('x_next', 'x', 0, 1),
-        # ('y_next', 'y', 0, 1),
+        # Registers
+        'p' : ['clk', 'p_next'],
+        'xy' : ['clk', 'next'],
 
-        # Concatenate
-        ('sl_y_fr_xy', 'cat_yx', 0, 0),
-        ('sl_x_fr_xy', 'cat_yx', 0, 1),
-        # ('x', 'cat_xy', 0, 0),
-        # ('y', 'cat_xy', 0, 1),
-        ('a', 'cat_ab', 0, 0),
-        ('b', 'cat_ab', 0, 1),
+        # Concatenations
+        'cat_yx' : ['sl_y_fr_xy', 'sl_x_fr_xy'],
+        'cat_ab' : ['a', 'b'],
+        'cat_x_y_sub_x' : ['sl_x_fr_xy', 'y_sub_x'],
 
-        ('sl_x_fr_xy', 'cat_x_y_sub_x', 0, 0),
-        ('y_sub_x', 'cat_x_y_sub_x', 0, 1),
+        # Negations
+        'not_p' : ['p'],
+        'not_rstn' : ['rstn'],
 
-        # not_p
-        ('p', 'not_p', 0, 0),
+        # Comparisions and subtraction
+        'x_ge_y' : ['sl_x_fr_xy', 'sl_y_fr_xy'],
+        'y_eq_0' : ['sl_y_fr_xy', 'c0_8'],
+        'y_sub_x' : ['sl_y_fr_xy', 'sl_x_fr_xy'],
 
-        # not_p
-        ('rstn', 'not_rstn', 0, 0),
+        # And gates
+        'begin_p' : ['in_valid', 'not_p'],
+        'y_eq_0_and_p' : ['y_eq_0', 'p'],
 
-        # begin_p
-        ('in_valid', 'begin_p', 0, 0),
-        ('not_p', 'begin_p', 0, 1),
+        # Five muxes
+        'next' : ['begin_p', 'cat_ab', 'next3'],
+        'next3' : ['x_ge_y', 'cat_yx', 'cat_x_y_sub_x'],
 
-        # x_ge_y
-        ('sl_x_fr_xy', 'x_ge_y', 0, 0),
-        ('sl_y_fr_xy', 'x_ge_y', 0, 1),
+        'p_next' : ['not_rstn', 'c0_1', 'p_next2'],
+        'p_next2' : ['begin_p', 'c1_1', 'p_next3'],
+        'p_next3' : ['y_eq_0', 'c0_1', 'p'],
 
-        # y_eq_0
-        ('sl_y_fr_xy', 'y_eq_0', 0, 0),
-        ('c0_8', 'y_eq_0', 0, 1),
-
-        # y_sub_x
-        ('sl_y_fr_xy', 'y_sub_x', 0, 0),
-        ('sl_x_fr_xy', 'y_sub_x', 0, 1),
-
-        # next
-        ('begin_p', 'next', 0, 0),
-        ('cat_ab', 'next', 0, 1),
-        ('next3', 'next', 0, 2),
-
-        # next3
-        ('x_ge_y', 'next3', 0, 0),
-        ('cat_yx', 'next3', 0, 1),
-        ('cat_x_y_sub_x', 'next3', 0, 2),
-
-        # next
-        ('begin_p', 'next', 0, 0),
-        ('cat_ab', 'next', 0, 1),
-        ('next3', 'next', 0, 2),
-
-        # Muxes and other stuff for p
-        ('not_p', 'in_ready', 0, 0),
-
-        ('not_rstn', 'p_next', 0, 0),
-        ('c0_1', 'p_next', 0, 1),
-        ('p_next2', 'p_next', 0, 2),
-
-        ('begin_p', 'p_next2', 0, 0),
-        ('c1_1', 'p_next2', 0, 1),
-        ('p_next3', 'p_next2', 0, 2),
-
-        ('y_eq_0', 'p_next3', 0, 0),
-        ('c0_1', 'p_next3', 0, 1),
-        ('p', 'p_next3', 0, 2),
-
-        # Other stuff
-        ('y_eq_0', 'y_eq_0_and_p', 0, 0),
-        ('p', 'y_eq_0_and_p', 0, 1),
-        ('y_eq_0_and_p', 'out_valid', 0, 0),
-        ('sl_x_fr_xy', 'o', 0, 0)
+        # Output variables
+        'in_ready' : ['not_p'],
+        'o' : ['sl_x_fr_xy'],
+        'out_valid' : ['y_eq_0_and_p']
     }
 
-    # Create pred and succ
-    succ = defaultdict(set)
-    pred = defaultdict(set)
-    for v1, v2, pf, pt in E:
-        succ[v1].add((pf, v2))
-        pred[v2].add((pt, v1))
-
-    pred = {k : [v2 for _, v2 in sorted(v)]
-            for (k, v) in pred.items()}
     OUTPUT.mkdir(exist_ok = True)
-
-
     tests = [
         {
             'name' : 'gcd(18, 12)',
@@ -579,9 +508,9 @@ def main():
     ]
     shuffle(tests)
 
-    render_verilog(V, E, pred, 'test01', OUTPUT)
-    render_verilog_tb(V, E, tests, 'test01', ('clk', 'rstn'), OUTPUT)
-    plot_hw_graph(V, E, 'test01', False, OUTPUT)
+    render_verilog(V, pred, 'test01', OUTPUT)
+    render_verilog_tb(V, tests, 'test01', ('clk', 'rstn'), OUTPUT)
+    plot_hw_graph(V, pred, 'test01', False, OUTPUT)
 
 
 
