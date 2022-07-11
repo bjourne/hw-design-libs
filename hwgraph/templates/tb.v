@@ -1,5 +1,8 @@
 `include "{{ mod_name }}.v"
 module {{ mod_name }}_tb();
+    // Cycle counter for prettier printing.
+    reg [15:0] cycle;
+
     // Input/output declarations
     {%- for ar, grp in gr_ins %}
     reg [{{ ar - 1 }}:0] {{ ', '.join(grp) }};
@@ -7,34 +10,44 @@ module {{ mod_name }}_tb();
     {%- for ar, grp in gr_outs %}
     wire [{{ ar - 1 }}:0] {{ ', '.join(grp) }};
     {%- endfor %}
-
-    {%- if clk_n_rstn %}
+    {% if clk_n_rstn %}
     {%- set clk, rstn = clk_n_rstn %}
     task tick; begin
         #5 {{ clk }} = ~{{ clk }};
+        cycle = cycle + 1;
         #5 {{ clk }} = ~{{ clk }};
     end endtask
-    {%- endif %}
-    initial begin
-        $display("{{ header_fmts | join(' ') }}",
-            {{ quoted_names|join(', ') }}
-        );
-        $monitor("{{ value_fmts|join(' ') }}", {{ names|join(', ') }});
-        {% if clk_n_rstn %}
-
+    {% for tc in tests %}
+    task tc_{{ "%02d" |format(loop.index0) }}; begin
+        $display("=== TC: {{ tc['name'] }} ===");
         {{ clk }} = 0;
-
-        {%- for tc in tests %}
-        $display("=== TC: %s ===", "{{ tc['name'] }}");
-        {%- for vars, delta in tc['setup'] %}
-        {%- for k, v in vars.items() %}
+        cycle = 0;
+        {%- for el in tc.get('exec', []) %}
+        {% for k, v in el.get('set', {}).items() %}
         {{ k }} = {{ v }};
         {%- endfor %}
-        repeat  ({{ delta }}) tick;
-        {%- endfor %}
-        {%- for k, v in tc['post'].items() %}
+        {%- for k, v in el.get('assert', {}).items() %}
         assert({{ k }} == {{ v }});
         {%- endfor %}
+        {%- if el.get('tick') %}
+        repeat({{ el['tick'] }}) tick;
+        {%- endif %}
+        {%- endfor %}
+    end endtask
+    {% endfor %}
+    {%- endif %}
+    initial begin
+        $display(
+            "{{ display_fmt }}",
+            {{ display_args }}
+        );
+        $monitor(
+            "{{ monitor_fmt }}",
+            {{ monitor_args }}
+        );
+        {% if clk_n_rstn %}
+        {%- for tc in tests %}
+        tc_{{ "%02d" |format(loop.index0) }};
         {%- endfor %}
 
         {%- else %}

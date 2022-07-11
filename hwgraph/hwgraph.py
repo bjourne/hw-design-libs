@@ -1,4 +1,4 @@
-from collections import defaultdict
+<from collections import defaultdict
 from itertools import groupby, product
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, Template
 from pathlib import Path
@@ -140,8 +140,16 @@ def render_verilog_tb(V, E, tests, mod_name, clk_n_rstn, dir):
     gr_outs = sort_groupby(outs, keyfun, elfun)
     inouts = ins + outs
 
-    value_fmts = [fmt_arity(*io) for io in inouts]
-    header_fmts = ['%5s' for _ in inouts]
+
+    monitor_params = [('cycle', 16)] + [(n, ar) for n, ar in inouts
+                                        if n not in clk_n_rstn[0]]
+
+    monitor_fmt = ' '.join(fmt_arity(n, ar) for n, ar in monitor_params)
+    monitor_args = ', '.join(n for n, _ in monitor_params)
+    display_fmt = ' '.join('%5s' for n, _ in monitor_params)
+    display_args = ', '.join(f'"{n}"' for n, _ in monitor_params)
+
+
     names = [n for (n, ar) in inouts]
     quoted_names = [f'"{n}"' for n in names]
 
@@ -157,8 +165,11 @@ def render_verilog_tb(V, E, tests, mod_name, clk_n_rstn, dir):
         'gr_ins' : gr_ins,
         'gr_outs' : gr_outs,
 
-        'value_fmts' : value_fmts,
-        'header_fmts' : header_fmts,
+        'display_fmt' : display_fmt,
+        'display_args' : display_args,
+        'monitor_fmt' : monitor_fmt,
+        'monitor_args' : monitor_args,
+
         'names' : names,
         'quoted_names' : quoted_names,
 
@@ -281,15 +292,27 @@ def main():
         'o' : ('output', 8),
 
         'c0_1' : ('const_0', 1),
+        'c1_1' : ('const_1', 1),
         'c0_8' : ('const_0', 8),
         'c7_8' : ('const_7', 8),
         'c8_8' : ('const_8', 8),
         'c15_8' : ('const_15', 8),
 
-        'begin_p' : ('and', 1),
-        'continue_p' : ('or', 1),
+        # P state
+        'p' : ('flip-flop', 1),
 
+        # Combinatorial
+        'begin_p' : ('and', 1),
         'not_p' : ('not', 1),
+
+        # Muxes
+        'p_next' : ('mux2', 1),
+        'p_next2' : ('mux2', 1),
+        'p_next3' : ('mux2', 1),
+
+        #'continue_p' : ('or', 1),
+
+        # 'not_p' : ('not', 1),
         'not_rstn' : ('not', 1),
 
         'x_ge_y' : ('ge', 1),
@@ -297,13 +320,12 @@ def main():
         'y_sub_x' : ('sub', 8),
 
         'y_eq_0_and_p' : ('and', 1),
-        'p_next' : ('mux2', 1),
+
 
         'next' : ('mux2', 16),
         'next2' : ('mux2', 16),
         'next3' : ('mux2', 16),
 
-        'p' : ('flip-flop', 1),
         'xy' : ('flip-flop', 16),
 
         'cat_ab' : ('cat', 16),
@@ -314,7 +336,6 @@ def main():
         'sl_x_fr_xy' : ('slice', 8)
     }
     E = {
-
         # Slicing
         ('xy', 'sl_y_fr_xy', 0, 0),
         ('c7_8', 'sl_y_fr_xy', 0, 1),
@@ -355,10 +376,6 @@ def main():
         ('in_valid', 'begin_p', 0, 0),
         ('not_p', 'begin_p', 0, 1),
 
-        # continue_p
-        ('p', 'continue_p', 0, 0),
-        ('in_valid', 'continue_p', 0, 0),
-
         # x_ge_y
         ('sl_x_fr_xy', 'x_ge_y', 0, 0),
         ('sl_y_fr_xy', 'x_ge_y', 0, 1),
@@ -391,13 +408,20 @@ def main():
         ('cat_ab', 'next', 0, 1),
         ('next2', 'next', 0, 2),
 
-        # Connect next muxes
+        # Muxes and other stuff for p
+        ('not_p', 'in_ready', 0, 0),
+
         ('not_rstn', 'p_next', 0, 0),
         ('c0_1', 'p_next', 0, 1),
-        ('continue_p', 'p_next', 0, 2),
+        ('p_next2', 'p_next', 0, 2),
 
-        # Stuff for p
-        ('not_p', 'in_ready', 0, 0),
+        ('begin_p', 'p_next2', 0, 0),
+        ('c1_1', 'p_next2', 0, 1),
+        ('p_next3', 'p_next2', 0, 2),
+
+        ('y_eq_0', 'p_next3', 0, 0),
+        ('c0_1', 'p_next3', 0, 1),
+        ('p', 'p_next3', 0, 2),
 
         # Other stuff
         ('y_eq_0', 'y_eq_0_and_p', 0, 0),
@@ -420,46 +444,115 @@ def main():
 
     tests = [
         {
-            'name' : 'Ready after reset',
-            'setup' : [
-                ({
+            'name' : 'gcd(18, 12)',
+            'exec' : [{
+                'set' : {
                     'rstn' : 0
-                }, 1)
-            ],
-            'post' : {'in_ready' : 1},
+                },
+                'tick' : 1
+            }, {
+                'set' : {
+                    'rstn' : 1,
+                    'in_valid' : 1,
+                    'a' : 18,
+                    'b' : 12
+                },
+                'tick' : 6
+            }, {
+                'assert' : {
+                    'out_valid' : 1,
+                    'o' : 6
+                }
+            }]
+        },
+        {
+            'name' : 'Ready only one tick',
+            'exec' : [{
+                'set' : {
+                    'rstn' : 0
+                },
+                'tick' : 1
+            }, {
+                'set' : {
+                    'rstn' : 1,
+                    'in_valid' : 1,
+                    'a' : 5,
+                    'b' : 2
+                },
+                'tick' : 1
+            }, {
+                'set' : {
+                    'a' : 22
+                },
+                'tick' : 1
+            }, {
+                'assert' : {
+                    'o' : 2,
+                    'in_ready' : 0
+                }
+            }]
         },
         {
             'name' : 'Propagate a to o',
-            'setup' : [
-                ({
+            'exec' : [{
+                'set' : {
                     'rstn' : 0
-                }, 1),
-                ({
+                },
+                'tick' : 1
+            }, {
+                'set' : {
                     'rstn' : 1,
                     'in_valid' : 1,
                     'a' : 5,
                     'b' : 2
-                }, 1)
-            ],
-            'post' : {'o' : 5}
+                },
+                'tick' : 1
+            }, {
+                'assert' : {'o' : 5}
+            }]
         },
         {
-            'name' : 'Read only one tick',
-            'setup' : [
-                ({
+            'name' : 'Ready after reset',
+            'exec' : [{
+                'set' : {
                     'rstn' : 0
-                }, 1),
-                ({
+                },
+                'tick' : 1
+            }, {
+                'assert' : {
+                    'in_ready' : 1
+                },
+            }]
+        },
+        {
+            'name' : 'gcd(14, 21) then in_ready',
+            'exec' : [{
+                'set' : {
+                    'rstn' : 0
+                },
+                'assert' : {},
+                'tick' : 1,
+            }, {
+                'set' : {
                     'rstn' : 1,
                     'in_valid' : 1,
-                    'a' : 5,
-                    'b' : 2
-                }, 1),
-                ({
-                    'a' : 22
-                }, 1)
-            ],
-            'post' : {'o' : 2}
+                    'a' : 14,
+                    'b' : 21
+                },
+                'assert' : {},
+                'tick' : 5
+            }, {
+                'set' : {},
+                'assert' : {
+                    'out_valid' : 1,
+                    'o' : 7
+                },
+                'tick' : 1
+            }, {
+                'assert' : {
+                    'in_ready' : 1
+                }
+            }]
         }
     ]
     shuffle(tests)
