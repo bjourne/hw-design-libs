@@ -1,4 +1,4 @@
-<from collections import defaultdict
+from collections import defaultdict
 from itertools import groupby, product
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, Template
 from pathlib import Path
@@ -247,7 +247,7 @@ def plot_hw_graph(V, E, mod_name, draw_clk, dir):
     G = AGraph(strict = False, directed = True)
     graph_attrs = {
         'dpi' : 300,
-        'ranksep' : 0.4,
+        'ranksep' : 0.3,
         'fontname' : 'Inconsolata',
         'bgcolor' : 'transparent',
         'rainkdir' : 'LR'
@@ -323,7 +323,6 @@ def main():
 
 
         'next' : ('mux2', 16),
-        'next2' : ('mux2', 16),
         'next3' : ('mux2', 16),
 
         'xy' : ('flip-flop', 16),
@@ -391,22 +390,17 @@ def main():
         # next
         ('begin_p', 'next', 0, 0),
         ('cat_ab', 'next', 0, 1),
-        ('next2', 'next', 0, 2),
+        ('next3', 'next', 0, 2),
 
         # next3
         ('x_ge_y', 'next3', 0, 0),
         ('cat_yx', 'next3', 0, 1),
         ('cat_x_y_sub_x', 'next3', 0, 2),
 
-        # next2
-        ('p', 'next2', 0, 0),
-        ('next3', 'next2', 0, 1),
-        ('xy', 'next2', 0, 2),
-
         # next
         ('begin_p', 'next', 0, 0),
         ('cat_ab', 'next', 0, 1),
-        ('next2', 'next', 0, 2),
+        ('next3', 'next', 0, 2),
 
         # Muxes and other stuff for p
         ('not_p', 'in_ready', 0, 0),
@@ -530,7 +524,6 @@ def main():
                 'set' : {
                     'rstn' : 0
                 },
-                'assert' : {},
                 'tick' : 1,
             }, {
                 'set' : {
@@ -539,7 +532,6 @@ def main():
                     'a' : 14,
                     'b' : 21
                 },
-                'assert' : {},
                 'tick' : 5
             }, {
                 'set' : {},
@@ -552,6 +544,36 @@ def main():
                 'assert' : {
                     'in_ready' : 1
                 }
+            }]
+        },
+        {
+            'name' : 'gcd(15, 10) then followup',
+            'exec' : [{
+                'set' : {
+                    'rstn' : 0
+                },
+                'tick' : 1,
+            }, {
+                'set' : {
+                    'rstn' : 1,
+                    'in_valid' : 1,
+                    'a' : 15,
+                    'b' : 10
+                },
+                'tick' : 6
+            }, {
+                'set' : {
+                    'in_valid' : 0
+                },
+                'assert' : {
+                    'out_valid' : 1
+                },
+                'tick' : 3
+            },  {
+                'assert' : {
+                    'in_ready' : 1,
+                    'o' : 0
+                },
             }]
         }
     ]
