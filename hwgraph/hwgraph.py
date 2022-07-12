@@ -25,6 +25,7 @@ class Vertex:
         self.arity = arity
         self.predecessors = []
         self.value = value
+        self.alias = None
 
         # We don't yet support vertices with multiple outputs.
         self.successors = []
@@ -32,6 +33,11 @@ class Vertex:
 
     def __repr__(self):
         return 'Vertex<%s:%s:%s>' % (self.name, self.type, self.arity or '?')
+
+def clone_vertex(v1):
+    v2 = Vertex(v1.name, v1.type, v1.arity, v1.value)
+    v2.internalized = v1.internalized
+    return v2
 
 def replace_vertex_pred(v, old, new):
     idx = v.predecessors.index(old)
@@ -54,6 +60,8 @@ TP_TO_SYMBOL = {
     'add' : '+',
     'not' : '!'
 }
+
+INTERNALIZABLE_TYPES = {'cat', 'const', 'input'} | BINARY_OPS | UNARY_OPS
 
 WIRE_OWNERS = {'if', 'input', 'output', 'reg'}
 OUTPUT = Path('output')
@@ -171,12 +179,10 @@ def render_verilog_tb(vertices, tests, mod_name, clk, rstn, dir):
         'tests' : tests,
         'io_groups' : io_groups,
         'inouts' : inouts,
-
         'display_fmt' : display_fmt,
         'display_args' : display_args,
         'monitor_fmt' : monitor_fmt,
         'monitor_args' : monitor_args,
-
         'clk' : clk,
         'rstn' : rstn
     }
@@ -185,16 +191,20 @@ def render_verilog_tb(vertices, tests, mod_name, clk, rstn, dir):
 def colorize(s, col):
     return '<font color="%s">%s</font>' % (col, s)
 
-def render_label(v):
+def render_label(v, use_alias):
     tp = v.type
     preds = v.predecessors
     interns = v.internalized
-    if tp == 'slice':
+    if use_alias and v.alias:
+        return colorize(v.alias, '#6ca471')
+    elif tp == 'slice':
         if interns:
             return f'[{interns[1].value}:{interns[2].value}]'
         return tp
     elif tp == 'const':
         return f'{v.value}'
+    elif tp == 'reg':
+        return v.name
     elif tp == 'input':
         return colorize(v.name, '#aa8888')
     elif tp == 'output':
@@ -202,7 +212,7 @@ def render_label(v):
     elif tp in UNARY_OPS:
         sym = escape(TP_TO_SYMBOL[tp])
         if interns:
-            x = render_label(interns[0])
+            x = render_label(interns[0], True)
             return f'{sym}{x}'
         return sym
     elif tp in BINARY_OPS:
@@ -210,33 +220,32 @@ def render_label(v):
         if interns:
             l, r = '**'
             if 0 in interns:
-                l = render_label(interns[0])
+                l = render_label(interns[0], True)
             if  1 in interns:
-                r = render_label(interns[1])
+                r = render_label(interns[1], True)
             return f'{l} {sym} {r}'
         return sym
     elif tp == 'if':
         if interns:
             cond, l, r = '***'
             if 0 in interns:
-                cond = render_label(interns[0])
+                cond = render_label(interns[0], True)
             if 1 in interns:
-                l = render_label(interns[1])
+                l = render_label(interns[1], True)
             if 2 in interns:
-                r = render_label(interns[2])
+                r = render_label(interns[2], True)
             return f'{cond} ? {l} : {r}'
         return tp
     elif tp == 'cat':
         if interns:
             parts = ['*'] * len(preds)
             for i, v2 in interns.items():
-                parts[i] = render_label(v2)
+                parts[i] = render_label(v2, True)
             return "{%s}" % ', '.join(parts)
         return tp
     else:
         assert False
     return label
-
 
 def style_node(v, draw_arities):
     n, tp = v.name, v.type
@@ -246,36 +255,25 @@ def style_node(v, draw_arities):
     color = 'black'
     fillcolor = 'white'
 
+    label = render_label(v, False)
+
     if tp == 'const':
         shape = 'box'
         width = height = 0.3
-        label = f'{v.value}'
-    elif tp in UNARY_OPS:
-        label = render_label(v)
-        # label = TP_TO_SYMBOL[tp]
-    elif tp in BINARY_OPS:
-        label = render_label(v)
     elif tp in ('input', 'output'):
         shape = 'oval'
-        label = render_label(v) # f'{n}'
         fillcolor = '#ffcccc' if tp == 'input' else '#bbccff'
     elif tp == 'if':
         shape = 'diamond'
-        label = render_label(v)
-        #label = f'{tp}'
     elif tp == 'reg':
-        label = f'{n}'
         fillcolor = '#ffffdd'
-    elif tp == 'cat':
-        label = render_label(v)
-        #label = f'{tp}'
-    elif tp == 'slice':
-        label = render_label(v)
-    else:
-        print(tp)
-        assert False
+
+    if v.alias:
+        var = colorize(v.alias, '#6ca471')
+        label = f'{var} &larr; {label}'
+
     if draw_arities:
-        label += f':{v.arity or "?"}'
+        label = f'{label}:{v.arity or "?"}'
 
     return {'shape' : shape,
             'label' : f'<{label}>',
@@ -411,7 +409,6 @@ def infer_arity_bwd(v):
             return assert_arity(v, inferred_arity)
         return False
 
-
 def infer_arities(vertices):
     changed = True
     while changed:
@@ -421,37 +418,48 @@ def infer_arities(vertices):
         for v in vertices:
             changed = changed or infer_arity_bwd(v)
 
-def internalize_vertices(vertices):
+def clone_simple_vertices(vertices):
     # Duplicate constant nodes
     clones = []
     for v1 in vertices:
         tp = v1.type
-        if tp == 'const':
+        if any(v1.predecessors):
+            continue
+        if tp in {'eq', 'const'} | UNARY_OPS | BINARY_OPS:
             hd, tl = v1.successors[0], v1.successors[1:]
             if tl:
                 for v2 in tl:
-                    v1p = Vertex(None, tp, v1.arity, v1.value)
+                    v1p = clone_vertex(v1)
                     replace_vertex_pred(v2, v1, v1p)
                     clones.append(v1p)
             v1.successors = [hd]
-    vertices.extend(clones)
+    return clones
 
-    print(len(vertices))
+def internalize_vertices(vertices):
     changed = True
     while changed:
         changed = False
+        vertices.extend(clone_simple_vertices(vertices))
+
         all_removed = []
         for v in vertices:
-            #ps = v.predecessors
             removed = []
             tp = v.type
             if tp in {'cat', 'slice', 'if'} | BINARY_OPS | UNARY_OPS:
                 for i, p in enumerate(list(v.predecessors)):
-                    if p and not any(p.predecessors) and p.type in ('cat', 'const', 'input'):
+                    if (p and
+                        p.type in INTERNALIZABLE_TYPES and
+                        not any(p.predecessors) and
+                        len(set(p.successors)) == 1):
                         v.internalized[i] = p
                         v.predecessors[i] = None
                         removed.append(p)
                         changed = True
+                    if p and p.alias:
+                        v.internalized[i] = p
+                        v.predecessors[i] = None
+                        p.successors.remove(v)
+
             all_removed.extend(removed)
         vertices = [v for v in vertices if v not in all_removed]
         print(len(vertices))
@@ -478,6 +486,9 @@ def main():
     for n, v in circuit['values'].items():
         vertices[n].value = v
 
+    for n, v in circuit['aliases'].items():
+        vertices[n].alias = v
+
     vertices = sorted(vertices.values(),
                       key = lambda v: (v.type, v.arity, v.name))
     infer_arities(vertices)
@@ -488,7 +499,6 @@ def main():
             print(v.successors)
         assert v.arity
 
-
     OUTPUT.mkdir(exist_ok = True)
     render_verilog(vertices, 'test01', OUTPUT)
 
@@ -498,8 +508,5 @@ def main():
 
     vertices = internalize_vertices(vertices)
     plot_vertices(vertices, OUTPUT / 'test01.png', False, False)
-
-
-
 
 main()

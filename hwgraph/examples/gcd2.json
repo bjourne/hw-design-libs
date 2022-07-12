@@ -54,6 +54,11 @@
         "c15_8" : 15,
         "c16_8" : 16
     },
+    "aliases" : {
+        "sl_p_fr_pxy" : "p",
+        "sl_x_fr_pxy" : "x",
+        "sl_y_fr_pxy" : "y"
+    },
     "types" : {
         "input" : ["clk", "rstn", "a", "b", "in_valid"],
         "output" : ["in_ready", "out_valid", "o"],

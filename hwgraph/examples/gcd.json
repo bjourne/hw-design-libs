@@ -1,12 +1,12 @@
 {
     "predecessors" : {
         // Slices
-        "sl_y_fr_xy" : ["xy", "c7_8", "c0_8"],
-        "sl_x_fr_xy" : ["xy", "c15_8", "c8_8"],
+        "sl_y_fr_xy" : ["reg_xy", "c7_8", "c0_8"],
+        "sl_x_fr_xy" : ["reg_xy", "c15_8", "c8_8"],
 
         // Registers
-        "p" : ["clk", "p_next"],
-        "xy" : ["clk", "next"],
+        "reg_p" : ["clk", "p_next"],
+        "reg_xy" : ["clk", "next"],
 
         // Concatenations
         "cat_yx" : ["sl_y_fr_xy", "sl_x_fr_xy"],
@@ -14,7 +14,7 @@
         "cat_x_y_sub_x" : ["sl_x_fr_xy", "y_sub_x"],
 
         // Negations
-        "not_p" : ["p"],
+        "not_p" : ["reg_p"],
         "not_rstn" : ["rstn"],
 
         // Comparisions and subtraction
@@ -24,7 +24,7 @@
 
         // And gates
         "begin_p" : ["in_valid", "not_p"],
-        "y_eq_0_and_p" : ["y_eq_0", "p"],
+        "y_eq_0_and_p" : ["y_eq_0", "reg_p"],
 
         // Five muxes
         "next" : ["begin_p", "cat_ab", "next3"],
@@ -32,7 +32,7 @@
 
         "p_next" : ["not_rstn", "c0_1", "p_next2"],
         "p_next2" : ["begin_p", "c1_1", "p_next3"],
-        "p_next3" : ["y_eq_0", "c0_1", "p"],
+        "p_next3" : ["y_eq_0", "c0_1", "reg_p"],
 
         // Output variables
         "in_ready" : ["not_p"],
@@ -51,13 +51,18 @@
         "c8_8" : 8,
         "c15_8" : 15
     },
+    "aliases" : {
+        "sl_x_fr_xy" : "x",
+        "sl_y_fr_xy" : "y",
+        "reg_p" : "p"
+    },
     "types" : {
         "input" : ["clk", "rstn", "a", "b", "in_valid"],
         "output" : ["in_ready", "out_valid", "o"],
         "const" : ["c0_1", "c0_8", "c1_1", "c7_8", "c8_8", "c15_8"],
 
         // Flip flops
-        "reg" : ["p", "xy"],
+        "reg" : ["reg_p", "reg_xy"],
 
         // Logic
         "and" : ["begin_p", "y_eq_0_and_p"],

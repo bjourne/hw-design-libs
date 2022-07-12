@@ -133,7 +133,7 @@
             "tick" : 3
         },  {
             "assert" : {
-                    "in_ready" : 1,
+                "in_ready" : 1,
                 "o" : 0
             }
         }]
