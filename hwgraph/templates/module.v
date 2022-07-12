@@ -1,35 +1,34 @@
-module {{ mod_name }} ({{ inouts|join(', ') }});
+module {{ mod_name }} ({{ inouts|map(attribute='name')|join(', ')  }});
     // Input/output declarations
-    {%- for ar, grp in gr_ins %}
-    input [{{ ar - 1 }}:0] {{ ', '.join(grp) }};
+    {%- for lval_tp, grp in io_groups %}
+    {%- for ar, vs in grp %}
+    {{ lval_tp }} [{{ ar - 1 }}:0] {{ vs|map(attribute='name')|join(', ') }};
     {%- endfor %}
-    {%- for ar, grp in gr_outs %}
-    output [{{ ar - 1 }}:0] {{ ', '.join(grp) }};
     {%- endfor %}
 
     // Flip-flop assignments
-    {%- for clk, ffs in ffs_per_clk.items() %}
-    {%- for n, wire, ar in ffs %}
-    reg [{{ ar - 1 }}:0] {{ n }};
+    {%- for clk, regs in regs_per_clk %}
+    {%- for v in regs %}
+    reg [{{ v.arity - 1 }}:0] {{ v.name }};
     {%- endfor %}
     {%- endfor %}
-    {%- for clk, ffs in ffs_per_clk.items() %}
+    {%- for clk, regs in regs_per_clk %}
     always @(posedge {{ clk }}) begin
-        {%- for n, wire, ar in ffs %}
-        {{ n }} <= {{ wire }};
+        {%- for v in regs %}
+        {{ v.name }} <= {{ v.predecessors[1].name }};
         {%- endfor %}
     end
     {%- endfor %}
 
     // Internal wires
-    {%- for n, tp, ar in internal_wires %}
-    {%- if tp in WIRE_OWNERS %}
-    {{ render_lval('wire', tp, n, ar) }} = {{ render_rval(V, pred, n, True) }};
+    {%- for v in internal_wires %}
+    {%- if v.type in WIRE_OWNERS %}
+    {{ render_lval('wire', v) }} = {{ render_rval(v, True) }};
     {%- endif %}
     {%- endfor %}
 
     // Output wires
-    {%- for n, tp, ar in output_wires %}
-    {{ render_lval('wire', tp, n, ar) }} = {{ render_rval(V, pred, n, True) }};
+    {%- for v in output_wires %}
+    {{ render_lval('wire', v) }} = {{ render_rval(v, True) }};
     {%- endfor %}
 endmodule

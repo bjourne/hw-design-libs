@@ -1,6 +1,8 @@
+# Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
 from collections import defaultdict
 from itertools import groupby, product
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, Template
+from json import loads
 from pathlib import Path
 from pygraphviz import AGraph
 from random import shuffle
@@ -14,49 +16,68 @@ def render_tmpl_to_file(tmpl_name, file_path, **kwargs):
     with open(file_path, 'wt') as of:
         of.write(txt + '\n')
 
-tp_to_binop = {
+class Vertex:
+    def __init__(self, name, type, arity):
+        self.name = name
+        self.type = type
+        self.arity = arity
+        self.predecessors = []
+
+        # We don't yet support vertices with multiple outputs.
+        self.successors  = set()
+
+    def __repr__(self):
+        return 'Vertex<%s:%s:%s>' % (self.name, self.type, self.arity or '?')
+
+DEFAULT_INT_ARITY = 20
+BINARY_OPS = {'and', 'xor', 'or', 'ge', 'eq', 'sub', 'add'}
+
+UNARY_OPS = {'not'}
+COMPARE_OPS = {'ge', 'eq'}
+ARITH_OPS = {'and', 'xor', 'or', 'sub', 'add'}
+TP_TO_SYMBOL = {
     'and' : '&',
     'xor' : '^',
     'or' : '|',
     'ge' : '>',
     'eq' : '==',
     'sub' : '-',
-    'add' : '+'
+    'add' : '+',
+    'not' : '!'
 }
 
-WIRE_OWNERS = {'mux2', 'input', 'output', 'flip-flop'}
+WIRE_OWNERS = {'if', 'input', 'output', 'reg'}
 OUTPUT = Path('output')
 
-def render_lval(lval_tp, tp, name, arity):
-    arity = f'[{arity-1}:0]'
-    return f'{lval_tp} {arity} {name}'
+def render_lval(lval_tp, v):
+    return f'{lval_tp} [{v.arity - 1}:0] {v.name}'
 
-def render_rval(V, pred, n, outer):
-    tp, ar = V[n]
-    is_binop = tp in tp_to_binop
+def render_rval(v1, outer):
     r_args = []
-    for n2 in pred.get(n, []):
-        r_arg = n2
-        if not V[n2][0] in WIRE_OWNERS:
-            r_arg = render_rval(V, pred, n2, outer and not is_binop)
+    tp = v1.type
+    is_binop = tp in BINARY_OPS
+    for v2 in v1.predecessors:
+        r_arg = v2.name
+        if not v2.type in WIRE_OWNERS:
+            r_arg = render_rval(v2, outer and not is_binop)
         r_args.append(r_arg)
     if tp.startswith('const_'):
         return tp[6:]
-    elif is_binop:
-        binop = tp_to_binop[tp]
-        s = f'{r_args[0]} {binop} {r_args[1]}'
-        if not outer:
-            s = f'({s})'
-        return s
-    elif tp == 'not':
-        return '!' + r_args[0]
-    elif tp == 'mux2':
+    elif tp == 'if':
         return '%s\n        ? %s\n        : %s' % tuple(r_args)
     elif tp == 'cat':
         return '{%s, %s}' % tuple(r_args)
     elif tp == 'slice':
         return '%s[%s:%s]' % tuple(r_args)
-    elif tp in ('input', 'flip-flop'):
+    elif is_binop:
+        binop = TP_TO_SYMBOL[tp]
+        s = f'{r_args[0]} {binop} {r_args[1]}'
+        if not outer:
+            s = f'({s})'
+        return s
+    elif tp == 'not':
+        return TP_TO_SYMBOL[tp] + r_args[0]
+    elif tp in ('input', 'reg'):
         return n
     elif tp == 'output':
         return r_args[0]
@@ -66,120 +87,91 @@ ENV.globals.update(zip = zip,
                    render_rval = render_rval,
                    render_lval = render_lval)
 
-def input_nodes(V):
-    ins = [(n, ar) for n, (tp, ar) in V.items() if tp == 'input']
-    return sorted(ins)
+def load_json(fname):
+    # I like having comments in JSON.
+    with open(fname, 'r') as f:
+        lines = [l.strip() for l in f.readlines()]
+        lines = [l for l in lines if not l.startswith('//')]
+    return loads('\n'.join(lines))
 
-def output_nodes(V):
-    outs = [(n, ar) for n, (tp, ar) in V.items() if tp == 'output']
-    return sorted(outs)
+def groupby_sort(seq, keyfun):
+    grps = groupby(seq, keyfun)
+    return sorted([(k, list(v)) for k, v in grps])
 
-def sort_groupby(seq, keyfun, valfun):
-    d = defaultdict(set)
-    for el in seq:
-        d[keyfun(el)].add(valfun(el))
-    return [(k, sorted(v)) for k, v in sorted(d.items())]
-
-def render_verilog(V, pred, mod_name, dir):
-    keyfun, elfun = lambda x: x[1], lambda x: x[0]
-    ins = input_nodes(V)
-    gr_ins = sort_groupby(ins, keyfun, elfun)
-
-    outs = output_nodes(V)
-    gr_outs = sort_groupby(outs, keyfun, elfun)
-
+def render_verilog(vertices, mod_name, path):
+    ins = [v for v in vertices if v.type == 'input']
+    outs = [v for v in vertices if v.type == 'output']
     inouts = ins + outs
-    inouts = [n for (n, ar) in inouts]
 
-    ffs_per_clk = defaultdict(set)
-    for ff, (tp, ar) in V.items():
-        if tp == 'flip-flop':
-            clk, wire = pred[ff]
-            ffs_per_clk[clk].add((ff, wire, ar))
+    keyfun = lambda v: v.arity
+    gr_ins = groupby_sort(ins, keyfun)
+    gr_outs = groupby_sort(outs, keyfun)
+    io_groups = [('input', gr_ins), ('output', gr_outs)]
 
-    ffs = [((k, V[k][1]), v) for k, v in pred.items()
-           if V[k][0] == 'flip-flop']
-    internal_wires = [(n, tp, ar) for (n, (tp, ar)) in V.items()
-                      if tp not in ('input', 'output', 'flip-flop')]
-    output_wires = [(n, tp, ar) for (n, (tp, ar)) in V.items()
-                    if tp == 'output']
+    # Group registers by driving clock.
+    regs = [v for v in vertices if v.type == 'reg']
+    regs_per_clk = groupby_sort(regs, lambda v: v.predecessors[0].name)
+
+    internal_wires = [v for v in vertices
+                      if v.type not in {'input', 'output', 'reg'}]
+
+    output_wires = [v for v in vertices if v.type == 'output']
 
     kwargs = {
         'inouts' : inouts,
-        'gr_ins' : gr_ins,
-        'gr_outs' : gr_outs,
-
+        'io_groups' : io_groups,
         'internal_wires' :  internal_wires,
         'output_wires' : output_wires,
-
-        'pred' : pred,
-        'V' : V,
-
-        'ffs' : ffs,
-        'ffs_per_clk' : ffs_per_clk,
+        'regs_per_clk' : regs_per_clk,
         'mod_name' : mod_name,
         'WIRE_OWNERS' : WIRE_OWNERS
     }
-    render_tmpl_to_file('module.v', dir / f'{mod_name}.v', **kwargs)
+    render_tmpl_to_file('module.v', path / f'{mod_name}.v', **kwargs)
 
-def render_verilog_tb(V, tests, mod_name, clk_n_rstn, dir):
-    def fmt_arity(n, ar):
-        size = max(5, len(n))
-        ind = 'b' if ar == 1  else 'd'
-        return f'%{size}{ind}'
-
-    keyfun, elfun = lambda x: x[1], lambda x: x[0]
-    ins = input_nodes(V)
-    gr_ins = sort_groupby(ins, keyfun, elfun)
-
-    outs = output_nodes(V)
-    gr_outs = sort_groupby(outs, keyfun, elfun)
+def render_verilog_tb(vertices, tests, mod_name, clk, rstn, dir):
+    ins = [v for v in vertices if v.type == 'input']
+    outs = [v for v in vertices if v.type == 'output']
     inouts = ins + outs
 
-    monitor_params = [('cycle', 16)] + [(n, ar) for n, ar in inouts
-                                        if n not in clk_n_rstn[0]]
+    keyfun = lambda v: v.arity
+    gr_ins = groupby_sort(ins, keyfun)
+    gr_outs = groupby_sort(outs, keyfun)
+    io_groups = [('reg', gr_ins), ('wire', gr_outs)]
 
-    monitor_fmt = ' '.join(fmt_arity(n, ar) for n, ar in monitor_params)
-    monitor_args = ', '.join(n for n, _ in monitor_params)
-    display_fmt = ' '.join('%5s' for n, _ in monitor_params)
-    display_args = ', '.join(f'"{n}"' for n, _ in monitor_params)
+    def fmt_arity(v):
+        size = max(5, len(v.name))
+        ind = 'b' if v.arity == 1 else 'd'
+        return f'%{size}{ind}'
+    monitor_verts = [Vertex('cycle', None, DEFAULT_INT_ARITY)] \
+        + [v for v in inouts if v.name not in clk]
 
-    names = [n for (n, ar) in inouts]
-    quoted_names = [f'"{n}"' for n in names]
+    monitor_fmt = ' '.join(fmt_arity(v) for v in monitor_verts)
+    monitor_args = ', '.join(v.name for v in monitor_verts)
 
-    ranges = [list(range(2**ar)) for (_, ar) in ins]
-    assignments = list(product(*ranges))
+    display_fmt = ' '.join('%5s' for _ in monitor_verts)
+    display_args = ', '.join(f'"{v.name}"' for v in monitor_verts)
+
     kw = {
         'mod_name' : mod_name,
         'tests' : tests,
-
-        'ins' : ins,
-        'outs' : outs,
-        'gr_ins' : gr_ins,
-        'gr_outs' : gr_outs,
+        'io_groups' : io_groups,
+        'inouts' : inouts,
 
         'display_fmt' : display_fmt,
         'display_args' : display_args,
         'monitor_fmt' : monitor_fmt,
         'monitor_args' : monitor_args,
 
-        'names' : names,
-        'quoted_names' : quoted_names,
-
-        # Assignments
-        'assignments' : assignments,
-
-        # Special signals
-        'clk_n_rstn' : clk_n_rstn,
-
-        # Rendering functions
-        'render_lval' : render_lval
+        'clk' : clk,
+        'rstn' : rstn
     }
     render_tmpl_to_file('tb.v', dir / f'{mod_name}_tb.v', **kw)
 
-def style_node(n, tp, ar):
+def style_node(v):
+    n, tp = v.name, v.type
+    ar = v.arity or '?'
+
     shape = 'box'
-    label = n
     width = height = 0.55
     color = 'black'
     fillcolor = 'white'
@@ -187,22 +179,23 @@ def style_node(n, tp, ar):
         shape = 'box'
         width = height = 0.3
         val = tp.replace('const_', '')
-        label = f'{val}[{ar}]'
-    elif tp in tp_to_binop:
-        label = tp_to_binop[tp]
-    elif tp == 'slice':
-        label = 'slice'
-    elif tp == 'not':
-        label = '!'
+        label = f'{val}:{ar}'
+    elif tp in TP_TO_SYMBOL:
+        label = f'{TP_TO_SYMBOL[tp]}:{ar}'
     elif tp in ('input', 'output'):
         shape = 'oval'
-        label = f'{n}[{ar}]'
-    elif tp == 'mux2':
+        label = f'{n}:{ar}'
+        fillcolor = '#ffcccc' if tp == 'input' else '#bbccff'
+    elif tp == 'if':
         shape = 'diamond'
-        label = tp
-    elif tp == 'flip-flop':
-        label = f'{n}[{ar}]'
+        label = f'{tp}:{ar}'
+    elif tp == 'reg':
+        label = f'{n}:{ar}'
         fillcolor = '#ffffdd'
+    elif tp in ('cat', 'slice'):
+        label = f'{tp}:{ar}'
+    else:
+        label = n
 
     return {'shape' : shape,
             'label' : label,
@@ -211,19 +204,19 @@ def style_node(n, tp, ar):
             'color' : color,
             'fillcolor' : fillcolor}
 
-def style_edge(n1, tp1, ar1, n2, tp2, ar2, pf, pt):
+def style_edge(pt, v1, v2):
     color = 'black'
     style = 'solid'
     penwidth = 0.5
-    if tp2 == 'mux2':
+    if v2.type == 'if':
         if pt == 1:
-            color = '#00aa00'
+            color = 'black;0.9999:#00aa00'
         elif pt == 2:
-            color = '#aa0000'
-    elif tp2 == 'flip-flop':
+            color = 'black;0.9999:#aa0000'
+    elif v2.type == 'reg':
         if pt == 0:
             style = 'dashed'
-    if ar1 != 1:
+    if v1.arity != 1:
         penwidth = 1.0
     return {
         'color' : color,
@@ -231,7 +224,7 @@ def style_edge(n1, tp1, ar1, n2, tp2, ar2, pf, pt):
         'penwidth' : penwidth
         }
 
-def plot_hw_graph(V, pred, mod_name, draw_clk, dir):
+def plot_hw_graph(vertices, mod_name, draw_clk, path):
     G = AGraph(strict = False, directed = True)
     graph_attrs = {
         'dpi' : 300,
@@ -253,259 +246,116 @@ def plot_hw_graph(V, pred, mod_name, draw_clk, dir):
     }
     G.edge_attr.update(edge_attrs)
 
-    for n, (tp, ar) in V.items():
-        attrs = style_node(n, tp, ar)
-        print('name', n)
-        if n != 'clk' or draw_clk:
-            G.add_node(n, **attrs)
+    for v in vertices:
+        if v.name != 'clk' or draw_clk:
+            attrs = style_node(v)
+            G.add_node(v.name, **attrs)
 
-    for n2, values in pred.items():
-        for pt, n1 in enumerate(values):
-            (tp1, ar1), (tp2, ar2) = V[n1], V[n2]
-            attrs = style_edge(n1, tp1, ar1, n2, tp2, ar2, None, pt)
-            if n1 != 'clk' or draw_clk:
-                G.add_edge(n1, n2, **attrs)
-    G.draw(dir / f'{mod_name}.png', prog='dot')
+    for v2 in vertices:
+        for i, v1 in enumerate(v2.predecessors):
+            if v1.name != 'clk' or draw_clk:
+                attrs = style_edge(i, v1, v2)
+                G.add_edge(v1.name, v2.name, **attrs)
+    G.draw(path / f'{mod_name}.png', prog='dot')
+
+def infer_arity_fwd(v):
+    if v.arity:
+        return False
+    ps = [p for p in v.predecessors]
+    arities = [p.arity for p in ps]
+    if v.type in {'if', 'reg'}:
+        arities = arities[1:]
+        ps = ps[1:]
+    if v.type == 'cat':
+        if all(arities):
+            v.arity = sum(arities)
+            return True
+    elif v.type == 'slice':
+        hi = int(ps[1].type[6:])
+        lo = int(ps[2].type[6:])
+        v.arity = hi - lo + 1
+        return True
+    elif v.type in {'if', 'reg'} | ARITH_OPS | UNARY_OPS:
+        if len(set(arities)) == 1 and arities[0]:
+            v.arity = arities[0]
+            return True
+    elif v.type in COMPARE_OPS:
+        v.arity = 1
+        return True
+    return False
+
+def assert_arity(v, arity):
+    if v.arity == arity:
+        return False
+    elif v.arity is None:
+        v.arity = arity
+        return True
+    print("%s incompatible with arity %d." % (v, arity))
+    print('Preds/succs: %s' % (v.predecessors, v.successors))
+    assert False
+
+def infer_arity_bwd(v):
+    data_ps = [p for p in v.predecessors]
+    if v.type in {'if', 'reg', 'slice'}:
+        data_ps = data_ps[1:]
+    if v.type in {'output'} | UNARY_OPS:
+        return assert_arity(data_ps[0], v.arity)
+    if v.type in BINARY_OPS | {'if', 'slice'}:
+        v1, v2 = data_ps
+        ar1, ar2 = v1.arity, v2.arity
+        changed = False
+        if ar1:
+            changed = assert_arity(v2, ar1)
+        if ar2:
+            changed = changed or assert_arity(v1, ar2)
+        if v.type == 'slice':
+            for vp in [v1, v2]:
+                if len(vp.successors) == 1 and not vp.arity:
+                    vp.arity = DEFAULT_INT_ARITY
+                    changed = True
+        return changed
+    return False
+
+
+def infer_arities(vertices):
+    print({'if', 'reg'} | ARITH_OPS | UNARY_OPS)
+    changed = True
+    while changed:
+        changed = False
+        for v in vertices:
+            changed = changed or infer_arity_fwd(v)
+        for v in vertices:
+            changed = changed or infer_arity_bwd(v)
 
 def main():
-    V = {
-        'clk' : ('input', 1),
-        'rstn' : ('input', 1),
-        'a' : ('input', 8),
-        'b' : ('input', 8),
-        'in_valid' : ('input', 1),
+    circuit = load_json('examples/gcd.json')
+    vertices = {}
+    for tp, ns in circuit['types'].items():
+        for n in ns:
+            vertices[n] = Vertex(n, None, None)
+            vertices[n].type = tp
+    for ar, ns in circuit['arities'].items():
+        ar = int(ar)
+        for n in ns:
+            vertices[n].arity = ar
+    for n, ps in circuit['predecessors'].items():
+        ps = [vertices[p] for p in ps]
+        v = vertices[n]
+        v.predecessors = ps
+        for p in ps:
+            p.successors.add(v)
 
-        'in_ready' : ('output', 1),
-        'out_valid' : ('output', 1),
-        'o' : ('output', 8),
-
-        'c0_1' : ('const_0', 1),
-        'c1_1' : ('const_1', 1),
-        'c0_8' : ('const_0', 8),
-        'c7_8' : ('const_7', 8),
-        'c8_8' : ('const_8', 8),
-        'c15_8' : ('const_15', 8),
-
-        'p' : ('flip-flop', 1),
-        'xy' : ('flip-flop', 16),
-
-        # Combinatorial
-        'begin_p' : ('and', 1),
-        'y_eq_0_and_p' : ('and', 1),
-        'not_p' : ('not', 1),
-        'not_rstn' : ('not', 1),
-
-        # Muxes
-        'p_next' : ('mux2', 1),
-        'p_next2' : ('mux2', 1),
-        'p_next3' : ('mux2', 1),
-        'next' : ('mux2', 16),
-        'next3' : ('mux2', 16),
-
-        'x_ge_y' : ('ge', 1),
-        'y_eq_0' : ('eq', 1),
-        'y_sub_x' : ('sub', 8),
-
-        'cat_ab' : ('cat', 16),
-        'cat_yx' : ('cat', 16),
-        'cat_x_y_sub_x' : ('cat', 16),
-
-        'sl_y_fr_xy' : ('slice', 8),
-        'sl_x_fr_xy' : ('slice', 8)
-    }
-
-
-    # This structure implies that nodes only have a single logical
-    # output. Might have to change in the future...
-    pred = {
-        # Slices
-        'sl_y_fr_xy' : ['xy', 'c7_8', 'c0_8'],
-        'sl_x_fr_xy' : ['xy', 'c15_8', 'c8_8'],
-
-        # Registers
-        'p' : ['clk', 'p_next'],
-        'xy' : ['clk', 'next'],
-
-        # Concatenations
-        'cat_yx' : ['sl_y_fr_xy', 'sl_x_fr_xy'],
-        'cat_ab' : ['a', 'b'],
-        'cat_x_y_sub_x' : ['sl_x_fr_xy', 'y_sub_x'],
-
-        # Negations
-        'not_p' : ['p'],
-        'not_rstn' : ['rstn'],
-
-        # Comparisions and subtraction
-        'x_ge_y' : ['sl_x_fr_xy', 'sl_y_fr_xy'],
-        'y_eq_0' : ['sl_y_fr_xy', 'c0_8'],
-        'y_sub_x' : ['sl_y_fr_xy', 'sl_x_fr_xy'],
-
-        # And gates
-        'begin_p' : ['in_valid', 'not_p'],
-        'y_eq_0_and_p' : ['y_eq_0', 'p'],
-
-        # Five muxes
-        'next' : ['begin_p', 'cat_ab', 'next3'],
-        'next3' : ['x_ge_y', 'cat_yx', 'cat_x_y_sub_x'],
-
-        'p_next' : ['not_rstn', 'c0_1', 'p_next2'],
-        'p_next2' : ['begin_p', 'c1_1', 'p_next3'],
-        'p_next3' : ['y_eq_0', 'c0_1', 'p'],
-
-        # Output variables
-        'in_ready' : ['not_p'],
-        'o' : ['sl_x_fr_xy'],
-        'out_valid' : ['y_eq_0_and_p']
-    }
+    vertices = sorted(vertices.values(),
+                      key = lambda v: (v.type, v.arity, v.name))
+    infer_arities(vertices)
 
     OUTPUT.mkdir(exist_ok = True)
-    tests = [
-        {
-            'name' : 'gcd(18, 12)',
-            'exec' : [{
-                'set' : {
-                    'rstn' : 0
-                },
-                'tick' : 1
-            }, {
-                'set' : {
-                    'rstn' : 1,
-                    'in_valid' : 1,
-                    'a' : 18,
-                    'b' : 12
-                },
-                'tick' : 6
-            }, {
-                'assert' : {
-                    'out_valid' : 1,
-                    'o' : 6
-                }
-            }]
-        },
-        {
-            'name' : 'Ready only one tick',
-            'exec' : [{
-                'set' : {
-                    'rstn' : 0
-                },
-                'tick' : 1
-            }, {
-                'set' : {
-                    'rstn' : 1,
-                    'in_valid' : 1,
-                    'a' : 5,
-                    'b' : 2
-                },
-                'tick' : 1
-            }, {
-                'set' : {
-                    'a' : 22
-                },
-                'tick' : 1
-            }, {
-                'assert' : {
-                    'o' : 2,
-                    'in_ready' : 0
-                }
-            }]
-        },
-        {
-            'name' : 'Propagate a to o',
-            'exec' : [{
-                'set' : {
-                    'rstn' : 0
-                },
-                'tick' : 1
-            }, {
-                'set' : {
-                    'rstn' : 1,
-                    'in_valid' : 1,
-                    'a' : 5,
-                    'b' : 2
-                },
-                'tick' : 1
-            }, {
-                'assert' : {'o' : 5}
-            }]
-        },
-        {
-            'name' : 'Ready after reset',
-            'exec' : [{
-                'set' : {
-                    'rstn' : 0
-                },
-                'tick' : 1
-            }, {
-                'assert' : {
-                    'in_ready' : 1
-                },
-            }]
-        },
-        {
-            'name' : 'gcd(14, 21) then in_ready',
-            'exec' : [{
-                'set' : {
-                    'rstn' : 0
-                },
-                'tick' : 1,
-            }, {
-                'set' : {
-                    'rstn' : 1,
-                    'in_valid' : 1,
-                    'a' : 14,
-                    'b' : 21
-                },
-                'tick' : 5
-            }, {
-                'set' : {},
-                'assert' : {
-                    'out_valid' : 1,
-                    'o' : 7
-                },
-                'tick' : 1
-            }, {
-                'assert' : {
-                    'in_ready' : 1
-                }
-            }]
-        },
-        {
-            'name' : 'gcd(15, 10) then followup',
-            'exec' : [{
-                'set' : {
-                    'rstn' : 0
-                },
-                'tick' : 1,
-            }, {
-                'set' : {
-                    'rstn' : 1,
-                    'in_valid' : 1,
-                    'a' : 15,
-                    'b' : 10
-                },
-                'tick' : 6
-            }, {
-                'set' : {
-                    'in_valid' : 0
-                },
-                'assert' : {
-                    'out_valid' : 1
-                },
-                'tick' : 3
-            },  {
-                'assert' : {
-                    'in_ready' : 1,
-                    'o' : 0
-                },
-            }]
-        }
-    ]
+
+    render_verilog(vertices, 'test01', OUTPUT)
+
+    tests = load_json('examples/gcd_tb.json')
     shuffle(tests)
-
-    render_verilog(V, pred, 'test01', OUTPUT)
-    render_verilog_tb(V, tests, 'test01', ('clk', 'rstn'), OUTPUT)
-    plot_hw_graph(V, pred, 'test01', False, OUTPUT)
-
-
+    render_verilog_tb(vertices, tests, 'test01', 'clk', 'rstn', OUTPUT)
+    plot_hw_graph(vertices, 'test01', False, OUTPUT)
 
 main()

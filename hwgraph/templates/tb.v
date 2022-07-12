@@ -4,14 +4,12 @@ module {{ mod_name }}_tb();
     reg [15:0] cycle;
 
     // Input/output declarations
-    {%- for ar, grp in gr_ins %}
-    reg [{{ ar - 1 }}:0] {{ ', '.join(grp) }};
+    {%- for lval_tp, grp in io_groups %}
+    {%- for ar, vs in grp %}
+    {{ lval_tp }} [{{ ar - 1 }}:0] {{ vs|map(attribute='name')|join(', ') }};
     {%- endfor %}
-    {%- for ar, grp in gr_outs %}
-    wire [{{ ar - 1 }}:0] {{ ', '.join(grp) }};
     {%- endfor %}
-    {% if clk_n_rstn %}
-    {%- set clk, rstn = clk_n_rstn %}
+    {% if clk %}
     task tick; begin
         #5 {{ clk }} = ~{{ clk }};
         cycle = cycle + 1;
@@ -45,20 +43,18 @@ module {{ mod_name }}_tb();
             "{{ monitor_fmt }}",
             {{ monitor_args }}
         );
-        {% if clk_n_rstn %}
+        {% if clk %}
         {%- for tc in tests %}
         tc_{{ "%02d" |format(loop.index0) }};
         {%- endfor %}
 
         {%- else %}
-        {%- for values in assignments %}
-        #5 {%- for v, (n, _) in zip(values, ins) %} {{ n }} = {{ v }}; {%- endfor %}
-        {%- endfor %}
+
         {%- endif %}
     end
     {{ mod_name }} dut (
-        {%- for n in names %}
-        .{{n }}({{n}}){% if not loop.last %},{% endif %}
+        {%- for v in inouts %}
+        .{{ v.name }}({{v.name}}){% if not loop.last %},{% endif %}
         {%- endfor %}
     );
 endmodule
