@@ -1,11 +1,13 @@
 # Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
 from collections import defaultdict
+from html import escape
 from itertools import groupby, product
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, Template
 from json import loads
 from pathlib import Path
 from pygraphviz import AGraph
 from random import shuffle
+from sys import argv
 
 TMPL_PATH = Path(__file__).parent / 'templates'
 ENV = Environment(loader = FileSystemLoader(TMPL_PATH),
@@ -59,27 +61,33 @@ OUTPUT = Path('output')
 def render_lval(lval_tp, v):
     return f'{lval_tp} [{v.arity - 1}:0] {v.name}'
 
-def render_rval(v1, outer):
+def render_rval_const(v, parent_tp):
+    if parent_tp == 'cat':
+        return f"{v.arity}'b{v.value}"
+    return f'{v.value}'
+
+def render_rval(v1, parent_tp):
     r_args = []
     tp = v1.type
     is_binop = tp in BINARY_OPS
     for v2 in v1.predecessors:
         r_arg = v2.name
         if not v2.type in WIRE_OWNERS:
-            r_arg = render_rval(v2, outer and not is_binop)
+            r_arg = render_rval(v2, tp)
         r_args.append(r_arg)
     if tp == 'const':
-        return v1.value
+        return render_rval_const(v1, parent_tp)
     elif tp == 'if':
         return '%s\n        ? %s\n        : %s' % tuple(r_args)
     elif tp == 'cat':
-        return '{%s, %s}' % tuple(r_args)
+        print(r_args)
+        return '{%s}' % ', '.join(r_args)
     elif tp == 'slice':
         return '%s[%s:%s]' % tuple(r_args)
     elif is_binop:
         binop = TP_TO_SYMBOL[tp]
         s = f'{r_args[0]} {binop} {r_args[1]}'
-        if not outer:
+        if parent_tp in BINARY_OPS:
             s = f'({s})'
         return s
     elif tp == 'not':
@@ -174,6 +182,9 @@ def render_verilog_tb(vertices, tests, mod_name, clk, rstn, dir):
     }
     render_tmpl_to_file('tb.v', dir / f'{mod_name}_tb.v', **kw)
 
+def colorize(s, col):
+    return '<font color="%s">%s</font>' % (col, s)
+
 def render_label(v):
     tp = v.type
     preds = v.predecessors
@@ -184,8 +195,18 @@ def render_label(v):
         return tp
     elif tp == 'const':
         return f'{v.value}'
+    elif tp == 'input':
+        return colorize(v.name, '#aa8888')
+    elif tp == 'output':
+        return colorize(v.name, '#7788aa')
+    elif tp in UNARY_OPS:
+        sym = escape(TP_TO_SYMBOL[tp])
+        if interns:
+            x = render_label(interns[0])
+            return f'{sym}{x}'
+        return sym
     elif tp in BINARY_OPS:
-        sym = TP_TO_SYMBOL[tp]
+        sym = escape(TP_TO_SYMBOL[tp])
         if interns:
             l, r = '**'
             if 0 in interns:
@@ -205,6 +226,13 @@ def render_label(v):
                 r = render_label(interns[2])
             return f'{cond} ? {l} : {r}'
         return tp
+    elif tp == 'cat':
+        if interns:
+            parts = ['*'] * len(preds)
+            for i, v2 in interns.items():
+                parts[i] = render_label(v2)
+            return "{%s}" % ', '.join(parts)
+        return tp
     else:
         assert False
     return label
@@ -223,12 +251,13 @@ def style_node(v, draw_arities):
         width = height = 0.3
         label = f'{v.value}'
     elif tp in UNARY_OPS:
-        label = TP_TO_SYMBOL[tp]
+        label = render_label(v)
+        # label = TP_TO_SYMBOL[tp]
     elif tp in BINARY_OPS:
         label = render_label(v)
     elif tp in ('input', 'output'):
         shape = 'oval'
-        label = f'{n}'
+        label = render_label(v) # f'{n}'
         fillcolor = '#ffcccc' if tp == 'input' else '#bbccff'
     elif tp == 'if':
         shape = 'diamond'
@@ -238,7 +267,8 @@ def style_node(v, draw_arities):
         label = f'{n}'
         fillcolor = '#ffffdd'
     elif tp == 'cat':
-        label = f'{tp}'
+        label = render_label(v)
+        #label = f'{tp}'
     elif tp == 'slice':
         label = render_label(v)
     else:
@@ -248,7 +278,7 @@ def style_node(v, draw_arities):
         label += f':{v.arity or "?"}'
 
     return {'shape' : shape,
-            'label' : label,
+            'label' : f'<{label}>',
             'width' : width,
             'height' : height,
             'color' : color,
@@ -352,12 +382,14 @@ def assert_arity(v, arity):
     assert False
 
 def infer_arity_bwd(v):
-    data_ps = [p for p in v.predecessors]
-    if v.type in {'if', 'reg', 'slice'}:
+    data_ps = v.predecessors
+    tp = v.type
+    arity = v.arity
+    if tp in {'if', 'reg', 'slice'}:
         data_ps = data_ps[1:]
-    if v.type in {'output'} | UNARY_OPS:
-        return assert_arity(data_ps[0], v.arity)
-    if v.type in BINARY_OPS | {'if', 'slice'}:
+    if tp in {'output'} | UNARY_OPS:
+        return assert_arity(data_ps[0], arity)
+    if tp in BINARY_OPS | {'if', 'slice'}:
         v1, v2 = data_ps
         ar1, ar2 = v1.arity, v2.arity
         changed = False
@@ -366,12 +398,19 @@ def infer_arity_bwd(v):
         if ar2:
             changed = changed or assert_arity(v1, ar2)
         if v.type == 'slice':
-            for vp in [v1, v2]:
-                if len(vp.successors) == 1 and not vp.arity:
-                    vp.arity = DEFAULT_INT_ARITY
+            for p in data_ps:
+                if len(set(p.successors)) == 1 and not p.arity:
+                    p.arity = DEFAULT_INT_ARITY
                     changed = True
         return changed
-    return False
+    elif tp == 'cat':
+        ps_arities = [p.arity for p in data_ps]
+        if arity and ps_arities.count(None) == 1:
+            inferred_arity = arity - sum(p for p in ps_arities if p)
+            v = data_ps[ps_arities.index(None)]
+            return assert_arity(v, inferred_arity)
+        return False
+
 
 def infer_arities(vertices):
     changed = True
@@ -397,22 +436,30 @@ def internalize_vertices(vertices):
             v1.successors = [hd]
     vertices.extend(clones)
 
-    all_removed = []
-    for v in vertices:
-        #ps = v.predecessors
-        removed = []
-        tp = v.type
-        if tp in ('eq', 'slice', 'if'):
-            for i, p in enumerate(list(v.predecessors)):
-                if p.type == 'const':
-                    v.internalized[i] = p
-                    v.predecessors[i] = None
-                    removed.append(p)
-        all_removed.extend(removed)
-    return [v for v in vertices if v not in all_removed]
+    print(len(vertices))
+    changed = True
+    while changed:
+        changed = False
+        all_removed = []
+        for v in vertices:
+            #ps = v.predecessors
+            removed = []
+            tp = v.type
+            if tp in {'cat', 'slice', 'if'} | BINARY_OPS | UNARY_OPS:
+                for i, p in enumerate(list(v.predecessors)):
+                    if p and not any(p.predecessors) and p.type in ('cat', 'const', 'input'):
+                        v.internalized[i] = p
+                        v.predecessors[i] = None
+                        removed.append(p)
+                        changed = True
+            all_removed.extend(removed)
+        vertices = [v for v in vertices if v not in all_removed]
+        print(len(vertices))
+    return vertices
 
 def main():
-    circuit = load_json('examples/gcd.json')
+    circuit_file, test_file = argv[1:]
+    circuit = load_json(circuit_file)
     vertices = {}
     for tp, ns in circuit['types'].items():
         for n in ns:
@@ -435,17 +482,24 @@ def main():
                       key = lambda v: (v.type, v.arity, v.name))
     infer_arities(vertices)
 
-    OUTPUT.mkdir(exist_ok = True)
+    for v in vertices:
+        if not v.arity:
+            print(v)
+            print(v.successors)
+        assert v.arity
 
+
+    OUTPUT.mkdir(exist_ok = True)
     render_verilog(vertices, 'test01', OUTPUT)
 
-    tests = load_json('examples/gcd_tb.json')
+    tests = load_json(test_file)
     shuffle(tests)
     render_verilog_tb(vertices, tests, 'test01', 'clk', 'rstn', OUTPUT)
 
-
     vertices = internalize_vertices(vertices)
-
     plot_vertices(vertices, OUTPUT / 'test01.png', False, False)
+
+
+
 
 main()

@@ -23,12 +23,12 @@ module {{ mod_name }} ({{ inouts|map(attribute='name')|join(', ')  }});
     // Internal wires
     {%- for v in internal_wires %}
     {%- if v.type in WIRE_OWNERS %}
-    {{ render_lval('wire', v) }} = {{ render_rval(v, True) }};
+    {{ render_lval('wire', v) }} = {{ render_rval(v, None) }};
     {%- endif %}
     {%- endfor %}
 
     // Output wires
     {%- for v in output_wires %}
-    {{ render_lval('wire', v) }} = {{ render_rval(v, True) }};
+    {{ render_lval('wire', v) }} = {{ render_rval(v, None) }};
     {%- endfor %}
 endmodule
