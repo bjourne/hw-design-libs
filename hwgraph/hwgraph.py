@@ -17,17 +17,24 @@ def render_tmpl_to_file(tmpl_name, file_path, **kwargs):
         of.write(txt + '\n')
 
 class Vertex:
-    def __init__(self, name, type, arity):
+    def __init__(self, name, type, arity, value):
         self.name = name
         self.type = type
         self.arity = arity
         self.predecessors = []
+        self.value = value
 
         # We don't yet support vertices with multiple outputs.
-        self.successors  = set()
+        self.successors = []
+        self.internalized = {}
 
     def __repr__(self):
         return 'Vertex<%s:%s:%s>' % (self.name, self.type, self.arity or '?')
+
+def replace_vertex_pred(v, old, new):
+    idx = v.predecessors.index(old)
+    v.predecessors[idx] = new
+    new.successors.append(v)
 
 DEFAULT_INT_ARITY = 20
 BINARY_OPS = {'and', 'xor', 'or', 'ge', 'eq', 'sub', 'add'}
@@ -61,8 +68,8 @@ def render_rval(v1, outer):
         if not v2.type in WIRE_OWNERS:
             r_arg = render_rval(v2, outer and not is_binop)
         r_args.append(r_arg)
-    if tp.startswith('const_'):
-        return tp[6:]
+    if tp == 'const':
+        return v1.value
     elif tp == 'if':
         return '%s\n        ? %s\n        : %s' % tuple(r_args)
     elif tp == 'cat':
@@ -142,7 +149,7 @@ def render_verilog_tb(vertices, tests, mod_name, clk, rstn, dir):
         size = max(5, len(v.name))
         ind = 'b' if v.arity == 1 else 'd'
         return f'%{size}{ind}'
-    monitor_verts = [Vertex('cycle', None, DEFAULT_INT_ARITY)] \
+    monitor_verts = [Vertex('cycle', None, DEFAULT_INT_ARITY, 0)] \
         + [v for v in inouts if v.name not in clk]
 
     monitor_fmt = ' '.join(fmt_arity(v) for v in monitor_verts)
@@ -167,35 +174,78 @@ def render_verilog_tb(vertices, tests, mod_name, clk, rstn, dir):
     }
     render_tmpl_to_file('tb.v', dir / f'{mod_name}_tb.v', **kw)
 
-def style_node(v):
+def render_label(v):
+    tp = v.type
+    preds = v.predecessors
+    interns = v.internalized
+    if tp == 'slice':
+        if interns:
+            return f'[{interns[1].value}:{interns[2].value}]'
+        return tp
+    elif tp == 'const':
+        return f'{v.value}'
+    elif tp in BINARY_OPS:
+        sym = TP_TO_SYMBOL[tp]
+        if interns:
+            l, r = '**'
+            if 0 in interns:
+                l = render_label(interns[0])
+            if  1 in interns:
+                r = render_label(interns[1])
+            return f'{l} {sym} {r}'
+        return sym
+    elif tp == 'if':
+        if interns:
+            cond, l, r = '***'
+            if 0 in interns:
+                cond = render_label(interns[0])
+            if 1 in interns:
+                l = render_label(interns[1])
+            if 2 in interns:
+                r = render_label(interns[2])
+            return f'{cond} ? {l} : {r}'
+        return tp
+    else:
+        assert False
+    return label
+
+
+def style_node(v, draw_arities):
     n, tp = v.name, v.type
-    ar = v.arity or '?'
 
     shape = 'box'
     width = height = 0.55
     color = 'black'
     fillcolor = 'white'
-    if tp.startswith('const'):
+
+    if tp == 'const':
         shape = 'box'
         width = height = 0.3
-        val = tp.replace('const_', '')
-        label = f'{val}:{ar}'
-    elif tp in TP_TO_SYMBOL:
-        label = f'{TP_TO_SYMBOL[tp]}:{ar}'
+        label = f'{v.value}'
+    elif tp in UNARY_OPS:
+        label = TP_TO_SYMBOL[tp]
+    elif tp in BINARY_OPS:
+        label = render_label(v)
     elif tp in ('input', 'output'):
         shape = 'oval'
-        label = f'{n}:{ar}'
+        label = f'{n}'
         fillcolor = '#ffcccc' if tp == 'input' else '#bbccff'
     elif tp == 'if':
         shape = 'diamond'
-        label = f'{tp}:{ar}'
+        label = render_label(v)
+        #label = f'{tp}'
     elif tp == 'reg':
-        label = f'{n}:{ar}'
+        label = f'{n}'
         fillcolor = '#ffffdd'
-    elif tp in ('cat', 'slice'):
-        label = f'{tp}:{ar}'
+    elif tp == 'cat':
+        label = f'{tp}'
+    elif tp == 'slice':
+        label = render_label(v)
     else:
-        label = n
+        print(tp)
+        assert False
+    if draw_arities:
+        label += f':{v.arity or "?"}'
 
     return {'shape' : shape,
             'label' : label,
@@ -224,14 +274,13 @@ def style_edge(pt, v1, v2):
         'penwidth' : penwidth
         }
 
-def plot_hw_graph(vertices, mod_name, draw_clk, path):
+def setup_graph():
     G = AGraph(strict = False, directed = True)
     graph_attrs = {
         'dpi' : 300,
         'ranksep' : 0.3,
         'fontname' : 'Inconsolata',
-        'bgcolor' : 'transparent',
-        'rainkdir' : 'LR'
+        'bgcolor' : 'transparent'
     }
     G.graph_attr.update(graph_attrs)
     node_attrs = {
@@ -245,18 +294,26 @@ def plot_hw_graph(vertices, mod_name, draw_clk, path):
         'fontsize' : '10pt'
     }
     G.edge_attr.update(edge_attrs)
+    return G
+
+
+def plot_vertices(vertices, png_path, draw_clk, draw_arities):
+    G = setup_graph()
+
+    # Vertices names are not always unique.
+    ids = {v : i for i, v in enumerate(vertices)}
 
     for v in vertices:
         if v.name != 'clk' or draw_clk:
-            attrs = style_node(v)
-            G.add_node(v.name, **attrs)
+            attrs = style_node(v, draw_arities)
+            G.add_node(ids[v], **attrs)
 
     for v2 in vertices:
         for i, v1 in enumerate(v2.predecessors):
-            if v1.name != 'clk' or draw_clk:
+            if v1 and v1.name != 'clk' or draw_clk:
                 attrs = style_edge(i, v1, v2)
-                G.add_edge(v1.name, v2.name, **attrs)
-    G.draw(path / f'{mod_name}.png', prog='dot')
+                G.add_edge(ids[v1], ids[v2], **attrs)
+    G.draw(png_path, prog='dot')
 
 def infer_arity_fwd(v):
     if v.arity:
@@ -271,8 +328,8 @@ def infer_arity_fwd(v):
             v.arity = sum(arities)
             return True
     elif v.type == 'slice':
-        hi = int(ps[1].type[6:])
-        lo = int(ps[2].type[6:])
+        hi = int(ps[1].value)
+        lo = int(ps[2].value)
         v.arity = hi - lo + 1
         return True
     elif v.type in {'if', 'reg'} | ARITH_OPS | UNARY_OPS:
@@ -316,9 +373,7 @@ def infer_arity_bwd(v):
         return changed
     return False
 
-
 def infer_arities(vertices):
-    print({'if', 'reg'} | ARITH_OPS | UNARY_OPS)
     changed = True
     while changed:
         changed = False
@@ -327,12 +382,41 @@ def infer_arities(vertices):
         for v in vertices:
             changed = changed or infer_arity_bwd(v)
 
+def internalize_vertices(vertices):
+    # Duplicate constant nodes
+    clones = []
+    for v1 in vertices:
+        tp = v1.type
+        if tp == 'const':
+            hd, tl = v1.successors[0], v1.successors[1:]
+            if tl:
+                for v2 in tl:
+                    v1p = Vertex(None, tp, v1.arity, v1.value)
+                    replace_vertex_pred(v2, v1, v1p)
+                    clones.append(v1p)
+            v1.successors = [hd]
+    vertices.extend(clones)
+
+    all_removed = []
+    for v in vertices:
+        #ps = v.predecessors
+        removed = []
+        tp = v.type
+        if tp in ('eq', 'slice', 'if'):
+            for i, p in enumerate(list(v.predecessors)):
+                if p.type == 'const':
+                    v.internalized[i] = p
+                    v.predecessors[i] = None
+                    removed.append(p)
+        all_removed.extend(removed)
+    return [v for v in vertices if v not in all_removed]
+
 def main():
     circuit = load_json('examples/gcd.json')
     vertices = {}
     for tp, ns in circuit['types'].items():
         for n in ns:
-            vertices[n] = Vertex(n, None, None)
+            vertices[n] = Vertex(n, None, None, None)
             vertices[n].type = tp
     for ar, ns in circuit['arities'].items():
         ar = int(ar)
@@ -343,7 +427,9 @@ def main():
         v = vertices[n]
         v.predecessors = ps
         for p in ps:
-            p.successors.add(v)
+            p.successors.append(v)
+    for n, v in circuit['values'].items():
+        vertices[n].value = v
 
     vertices = sorted(vertices.values(),
                       key = lambda v: (v.type, v.arity, v.name))
@@ -356,6 +442,10 @@ def main():
     tests = load_json('examples/gcd_tb.json')
     shuffle(tests)
     render_verilog_tb(vertices, tests, 'test01', 'clk', 'rstn', OUTPUT)
-    plot_hw_graph(vertices, 'test01', False, OUTPUT)
+
+
+    vertices = internalize_vertices(vertices)
+
+    plot_vertices(vertices, OUTPUT / 'test01.png', False, False)
 
 main()

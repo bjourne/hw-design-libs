@@ -43,14 +43,18 @@
         "1" : ["clk", "rstn", "in_valid", "in_ready", "out_valid"],
         "8" : ["a", "b", "o"]
     },
+    "values" : {
+        "c0_1" : 0,
+        "c0_8" : 0,
+        "c1_1" : 1,
+        "c7_8" : 7,
+        "c8_8" : 8,
+        "c15_8" : 15
+    },
     "types" : {
         "input" : ["clk", "rstn", "a", "b", "in_valid"],
         "output" : ["in_ready", "out_valid", "o"],
-        "const_0" : ["c0_1", "c0_8"],
-        "const_1" : ["c1_1"],
-        "const_7" : ["c7_8"],
-        "const_8" : ["c8_8"],
-        "const_15" : ["c15_8"],
+        "const" : ["c0_1", "c0_8", "c1_1", "c7_8", "c8_8", "c15_8"],
 
         // Flip flops
         "reg" : ["p", "xy"],
