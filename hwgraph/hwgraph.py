@@ -69,30 +69,25 @@ OUTPUT = Path('output')
 def render_lval(lval_tp, v):
     return f'{lval_tp} [{v.arity - 1}:0] {v.name}'
 
-def render_rval_const(v, parent_tp):
-    if parent_tp == 'cat':
-        return f"{v.arity}'b{v.value}"
-    return f'{v.value}'
-
 def render_rval(v1, parent_tp):
     r_args = []
     tp = v1.type
-    is_binop = tp in BINARY_OPS
     for v2 in v1.predecessors:
         r_arg = v2.name
         if not v2.type in WIRE_OWNERS:
             r_arg = render_rval(v2, tp)
         r_args.append(r_arg)
     if tp == 'const':
-        return render_rval_const(v1, parent_tp)
+        if parent_tp == 'cat':
+            return f"{v1.arity}'b{v1.value}"
+        return f'{v1.value}'
     elif tp == 'if':
         return '%s\n        ? %s\n        : %s' % tuple(r_args)
     elif tp == 'cat':
-        print(r_args)
         return '{%s}' % ', '.join(r_args)
     elif tp == 'slice':
         return '%s[%s:%s]' % tuple(r_args)
-    elif is_binop:
+    elif tp in BINARY_OPS:
         binop = TP_TO_SYMBOL[tp]
         s = f'{r_args[0]} {binop} {r_args[1]}'
         if parent_tp in BINARY_OPS:
@@ -151,7 +146,35 @@ def render_verilog(vertices, mod_name, path):
     }
     render_tmpl_to_file('module.v', path / f'{mod_name}.v', **kwargs)
 
-def render_verilog_tb(vertices, tests, mod_name, clk, rstn, dir):
+def fmt_arity(v, ind):
+    size = max(5, len(v.name))
+    if not ind:
+        ind = 'b' if v.arity == 1 else 'd'
+    return f'%{size}{ind}'
+
+def ansi_escape(s, tp, col):
+    return '%%c[%d;%dm' % (tp, col) + s + '%c[0m'
+
+def flatten(seq):
+    return [y for x in seq for y in x]
+
+def render_fmts(vs, ind):
+    colors = {
+        'input' : 36,
+        'output' : 33,
+        None : 37
+    }
+    fmts = [ansi_escape(fmt_arity(v, ind), 1, colors[v.type])
+            for v in vs]
+    return ' '.join(fmts)
+
+def render_args(vs, quote):
+    args = [['27', f'"{v.name}"' if quote else v.name, '27']
+            for v in vs]
+    args = flatten(args)
+    return ', '.join(args)
+
+def render_verilog_tb(vertices, tests, mod_name, clk, path):
     ins = [v for v in vertices if v.type == 'input']
     outs = [v for v in vertices if v.type == 'output']
     inouts = ins + outs
@@ -161,41 +184,36 @@ def render_verilog_tb(vertices, tests, mod_name, clk, rstn, dir):
     gr_outs = groupby_sort(outs, keyfun)
     io_groups = [('reg', gr_ins), ('wire', gr_outs)]
 
-    def fmt_arity(v):
-        size = max(5, len(v.name))
-        ind = 'b' if v.arity == 1 else 'd'
-        return f'%{size}{ind}'
-    monitor_verts = [Vertex('cycle', None, DEFAULT_INT_ARITY, 0)] \
-        + [v for v in inouts if v.name not in clk]
+    mon_verts = [Vertex('cycle', None, DEFAULT_INT_ARITY, 0)] \
+        + [v for v in inouts if v.name != 'clk']
 
-    monitor_fmt = ' '.join(fmt_arity(v) for v in monitor_verts)
-    monitor_args = ', '.join(v.name for v in monitor_verts)
+    disp_fmt = render_fmts(mon_verts, 's')
+    disp_args = render_args(mon_verts, True)
 
-    display_fmt = ' '.join('%5s' for _ in monitor_verts)
-    display_args = ', '.join(f'"{v.name}"' for v in monitor_verts)
+    mon_fmt = render_fmts(mon_verts, None)
+    mon_args = render_args(mon_verts, False)
 
     kw = {
         'mod_name' : mod_name,
         'tests' : tests,
         'io_groups' : io_groups,
         'inouts' : inouts,
-        'display_fmt' : display_fmt,
-        'display_args' : display_args,
-        'monitor_fmt' : monitor_fmt,
-        'monitor_args' : monitor_args,
-        'clk' : clk,
-        'rstn' : rstn
+        'disp_fmt' : disp_fmt,
+        'disp_args' : disp_args,
+        'mon_fmt' : mon_fmt,
+        'mon_args' : mon_args,
+        'clk' : clk
     }
-    render_tmpl_to_file('tb.v', dir / f'{mod_name}_tb.v', **kw)
+    render_tmpl_to_file('tb.v', path / f'{mod_name}_tb.v', **kw)
 
 def colorize(s, col):
     return '<font color="%s">%s</font>' % (col, s)
 
-def render_label(v, use_alias):
+def render_label(v, parent_tp):
     tp = v.type
     preds = v.predecessors
     interns = v.internalized
-    if use_alias and v.alias:
+    if not parent_tp and v.alias:
         return colorize(v.alias, '#6ca471')
     elif tp == 'slice':
         if interns:
@@ -212,26 +230,29 @@ def render_label(v, use_alias):
     elif tp in UNARY_OPS:
         sym = escape(TP_TO_SYMBOL[tp])
         if interns:
-            x = render_label(interns[0], True)
+            x = render_label(interns[0], tp)
             return f'{sym}{x}'
         return sym
     elif tp in BINARY_OPS:
         sym = escape(TP_TO_SYMBOL[tp])
-        if interns:
-            l, r = '**'
-            if 0 in interns:
-                l = render_label(interns[0], True)
-            if  1 in interns:
-                r = render_label(interns[1], True)
-            return f'{l} {sym} {r}'
-        return sym
+        if not interns:
+            return sym
+        l, r = '**'
+        if 0 in interns:
+            l = render_label(interns[0], tp)
+        if  1 in interns:
+            r = render_label(interns[1], tp)
+        s = f'{l} {sym} {r}'
+        if parent_tp in BINARY_OPS:
+            s = f'({s})'
+        return s
     elif tp == 'if':
         if interns:
             cond, l, r = '***'
             if 0 in interns:
-                cond = render_label(interns[0], True)
+                cond = render_label(interns[0], tp)
             if 1 in interns:
-                l = render_label(interns[1], True)
+                l = render_label(interns[1], tp)
             if 2 in interns:
                 r = render_label(interns[2], True)
             return f'{cond} ? {l} : {r}'
@@ -240,7 +261,7 @@ def render_label(v, use_alias):
         if interns:
             parts = ['*'] * len(preds)
             for i, v2 in interns.items():
-                parts[i] = render_label(v2, True)
+                parts[i] = render_label(v2, tp)
             return "{%s}" % ', '.join(parts)
         return tp
     else:
@@ -255,8 +276,7 @@ def style_node(v, draw_arities):
     color = 'black'
     fillcolor = 'white'
 
-    label = render_label(v, False)
-
+    label = render_label(v, None)
     if tp == 'const':
         shape = 'box'
         width = height = 0.3
@@ -425,7 +445,7 @@ def clone_simple_vertices(vertices):
         tp = v1.type
         if any(v1.predecessors):
             continue
-        if tp in {'eq', 'const'} | UNARY_OPS | BINARY_OPS:
+        if tp in {'eq', 'const', 'input'} | UNARY_OPS | BINARY_OPS:
             hd, tl = v1.successors[0], v1.successors[1:]
             if tl:
                 for v2 in tl:
@@ -462,7 +482,6 @@ def internalize_vertices(vertices):
 
             all_removed.extend(removed)
         vertices = [v for v in vertices if v not in all_removed]
-        print(len(vertices))
     return vertices
 
 def main():
@@ -504,7 +523,7 @@ def main():
 
     tests = load_json(test_file)
     shuffle(tests)
-    render_verilog_tb(vertices, tests, 'test01', 'clk', 'rstn', OUTPUT)
+    render_verilog_tb(vertices, tests, 'test01', False, OUTPUT)
 
     vertices = internalize_vertices(vertices)
     plot_vertices(vertices, OUTPUT / 'test01.png', False, False)

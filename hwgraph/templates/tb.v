@@ -1,6 +1,6 @@
 `include "{{ mod_name }}.v"
 module {{ mod_name }}_tb();
-    // Cycle counter for prettier printing.
+    // Cycle counter
     reg [15:0] cycle;
 
     // Input/output declarations
@@ -9,16 +9,21 @@ module {{ mod_name }}_tb();
     {{ lval_tp }} [{{ ar - 1 }}:0] {{ vs|map(attribute='name')|join(', ') }};
     {%- endfor %}
     {%- endfor %}
-    {% if clk %}
     task tick; begin
-        #5 {{ clk }} = ~{{ clk }};
+        {%- if clk %}
+        #5 clk = ~clk;
         cycle = cycle + 1;
-        #5 {{ clk }} = ~{{ clk }};
+        #5 clk = ~clk;
+        {%- else %}
+        #5 cycle = cycle + 1;
+        {%- endif %}
     end endtask
     {% for tc in tests %}
     task tc_{{ "%02d" |format(loop.index0) }}; begin
         $display("=== TC: {{ tc['name'] }} ===");
-        {{ clk }} = 0;
+        {%- if clk %}
+        clk = 0;
+        {%- endif %}
         cycle = 0;
         {%- for el in tc.get('exec', []) %}
         {% for k, v in el.get('set', {}).items() %}
@@ -33,24 +38,12 @@ module {{ mod_name }}_tb();
         {%- endfor %}
     end endtask
     {% endfor %}
-    {%- endif %}
     initial begin
-        $display(
-            "{{ display_fmt }}",
-            {{ display_args }}
-        );
-        $monitor(
-            "{{ monitor_fmt }}",
-            {{ monitor_args }}
-        );
-        {% if clk %}
+        $display("{{ disp_fmt }}", {{ disp_args }});
+        $monitor("{{ mon_fmt }}", {{ mon_args }});
         {%- for tc in tests %}
         tc_{{ "%02d" |format(loop.index0) }};
         {%- endfor %}
-
-        {%- else %}
-
-        {%- endif %}
     end
     {{ mod_name }} dut (
         {%- for v in inouts %}
