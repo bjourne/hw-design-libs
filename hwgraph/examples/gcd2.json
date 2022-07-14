@@ -1,5 +1,5 @@
 // Same GCD except now we are squeezing all state into one register.
-{
+    {
     "predecessors" : {
         // Slices
         "sl_p_fr_pxy" : ["pxy", "c16_8", "c16_8"],

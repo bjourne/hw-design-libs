@@ -4,6 +4,7 @@ from html import escape
 from itertools import groupby, product
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, Template
 from json import loads
+from more_itertools import partition
 from pathlib import Path
 from pygraphviz import AGraph
 from random import shuffle
@@ -174,7 +175,7 @@ def render_args(vs, quote):
     args = flatten(args)
     return ', '.join(args)
 
-def render_verilog_tb(vertices, tests, mod_name, clk, path):
+def render_verilog_tb(vertices, tests, mod_name, path):
     ins = [v for v in vertices if v.type == 'input']
     outs = [v for v in vertices if v.type == 'output']
     inouts = ins + outs
@@ -184,8 +185,10 @@ def render_verilog_tb(vertices, tests, mod_name, clk, path):
     gr_outs = groupby_sort(outs, keyfun)
     io_groups = [('reg', gr_ins), ('wire', gr_outs)]
 
+    inouts_no_clk, inouts_clk = partition(lambda v: v.name == 'clk', inouts)
+
     mon_verts = [Vertex('cycle', None, DEFAULT_INT_ARITY, 0)] \
-        + [v for v in inouts if v.name != 'clk']
+        + list(inouts_no_clk)
 
     disp_fmt = render_fmts(mon_verts, 's')
     disp_args = render_args(mon_verts, True)
@@ -202,7 +205,7 @@ def render_verilog_tb(vertices, tests, mod_name, clk, path):
         'disp_args' : disp_args,
         'mon_fmt' : mon_fmt,
         'mon_args' : mon_args,
-        'clk' : clk
+        'has_clk' : list(inouts_clk)
     }
     render_tmpl_to_file('tb.v', path / f'{mod_name}_tb.v', **kw)
 
@@ -213,7 +216,7 @@ def render_label(v, parent_tp):
     tp = v.type
     preds = v.predecessors
     interns = v.internalized
-    if not parent_tp and v.alias:
+    if parent_tp and v.alias:
         return colorize(v.alias, '#6ca471')
     elif tp == 'slice':
         if interns:
@@ -523,9 +526,10 @@ def main():
 
     tests = load_json(test_file)
     shuffle(tests)
-    render_verilog_tb(vertices, tests, 'test01', False, OUTPUT)
 
-    vertices = internalize_vertices(vertices)
+    render_verilog_tb(vertices, tests, 'test01', OUTPUT)
+
+    #vertices = internalize_vertices(vertices)
     plot_vertices(vertices, OUTPUT / 'test01.png', False, False)
 
 main()

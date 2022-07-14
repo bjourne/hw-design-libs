@@ -10,7 +10,7 @@ module {{ mod_name }}_tb();
     {%- endfor %}
     {%- endfor %}
     task tick; begin
-        {%- if clk %}
+        {%- if has_clk %}
         #5 clk = ~clk;
         cycle = cycle + 1;
         #5 clk = ~clk;
@@ -21,7 +21,7 @@ module {{ mod_name }}_tb();
     {% for tc in tests %}
     task tc_{{ "%02d" |format(loop.index0) }}; begin
         $display("=== TC: {{ tc['name'] }} ===");
-        {%- if clk %}
+        {%- if has_clk %}
         clk = 0;
         {%- endif %}
         cycle = 0;
