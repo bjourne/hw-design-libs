@@ -15,14 +15,19 @@ module {{ mod_name }} ({{ inouts|map(attribute='name')|join(', ')  }});
     {%- for clk, regs in regs_per_clk %}
     always @(posedge {{ clk }}) begin
         {%- for v in regs %}
-        {{ v.name }} <= {{ v.predecessors[1].name }};
+        {%- set inp = v.predecessors[1] %}
+        {%- if inp.type.verilog_node %}
+        {{ v.name }} <= {{ inp.name }};
+        {%- else %}
+        {{ v.name }} <= {{ render_rval(inp, None) }};
+        {%- endif %}
         {%- endfor %}
     end
     {%- endfor %}
 
     // Internal wires
     {%- for v in internal_wires %}
-    {%- if v.type in WIRE_OWNERS %}
+    {%- if v.type.verilog_node %}
     {{ render_lval('wire', v) }} = {{ render_rval(v, None) }};
     {%- endif %}
     {%- endfor %}

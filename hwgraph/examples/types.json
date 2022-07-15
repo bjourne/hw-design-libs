@@ -1,0 +1,97 @@
+{
+    "input" : {
+        "input" : [],
+        "output" : ["o"],
+        "verilog_node" : false
+    },
+    "output" : {
+        "input" : ["i"],
+        "output" : [],
+        "verilog_node" : true
+    },
+    "const" : {
+        "input" : [],
+        "output" : ["o"],
+        "verilog_node" : false
+    },
+    // Structural
+    "cat" : {
+        "input" : ["i1", "i2"],
+        "output" : ["o"],
+        "arity_constraints" : [
+            ["equals", ["add", "i1", "i2"], "o"]
+        ],
+        "verilog_node" : false
+    },
+    "slice" : {
+        "input" : ["bits", "hi", "lo"],
+        "output" : ["o"],
+        "verilog_node" : false
+    },
+    // Logic
+    "not" : {
+        "input" : ["i"],
+        "output" : ["o"],
+        "arity_constraints" : [
+            ["equals", "i", "o"]
+        ],
+        "verilog_node" : false
+    },
+
+    // Comparisons
+    "eq" : {
+        "input": ["i1", "i2"],
+        "output": ["o"],
+        "arity_constraints" : [
+            ["equals", "o", 1],
+            ["equals", "i1", "i2"]
+        ],
+        "verilog_node" : false
+    },
+    "ge" : {
+        "input": ["i1", "i2"],
+        "output": ["o"],
+        "arity_constraints" : [
+            ["equals", "o", 1],
+            ["equals", "i1", "i2"]
+        ],
+        "verilog_node" : false
+    },
+    "and" : {
+        "input": ["i1", "i2"],
+        "output": ["o"],
+        "arity_constraints" : [
+            ["equals", "i1", "i2"],
+            ["equals", "i2", "o"]
+        ],
+        "verilog_node" : false
+    },
+    "sub" : {
+        "input": ["i1", "i2"],
+        "output": ["o"],
+        "arity_constraints" : [
+            ["equals", "i1", "i2"],
+            ["equals", "i2", "o"]
+        ],
+        "verilog_node" : false
+    },
+    "if" : {
+        "input" : ["c", "i1", "i2"],
+        "output" : ["o"],
+        "arity_constraints" : [
+            ["equals", "i1", "i2"],
+            ["equals", "i2", "o"],
+            ["equals", "c", 1]
+        ],
+        "verilog_node" : true
+    },
+    "reg" : {
+        "input" : ["clk", "i"],
+        "output" : ["o"],
+        "arity_constraints" : [
+            ["equals", "clk", 1],
+            ["equals", "i", "o"]
+        ],
+        "verilog_node" : true
+    }
+}

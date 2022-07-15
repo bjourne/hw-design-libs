@@ -24,7 +24,6 @@ DEFAULT_INT_ARITY = 20
 COMPARE_OPS = {'ge', 'eq'}
 ARITH_OPS = {'and', 'xor', 'or', 'sub', 'add'}
 
-WIRE_OWNERS = {'if', 'input', 'output', 'reg'}
 OUTPUT = Path('output')
 
 def render_lval(lval_tp, v):
@@ -32,11 +31,11 @@ def render_lval(lval_tp, v):
 
 def render_rval(v1, parent_tp):
     r_args = []
-    tp = v1.type
+    tp = v1.type.name
     sym = TYPE_TO_SYMBOL.get(tp)
     for v2 in v1.predecessors:
         r_arg = v2.name
-        if not v2.type in WIRE_OWNERS:
+        if not v2.type.verilog_node:
             r_arg = render_rval(v2, tp)
         r_args.append(r_arg)
     if tp == 'const':
@@ -57,7 +56,7 @@ def render_rval(v1, parent_tp):
     elif tp in UNARY_OPS:
         return f'{sym}{r_args[0]}'
     elif tp in {'input', 'reg'}:
-        return n
+        return v1.name
     elif tp == 'output':
         return r_args[0]
     assert False
@@ -75,11 +74,13 @@ def load_json(fname):
 
 def groupby_sort(seq, keyfun):
     grps = groupby(seq, keyfun)
-    return sorted([(k, list(v)) for k, v in grps])
+    grps = [(k, list(v)) for k, v in grps]
+    print(grps)
+    return sorted(grps)
 
 def render_verilog(vertices, mod_name, path):
-    ins = [v for v in vertices if v.type == 'input']
-    outs = [v for v in vertices if v.type == 'output']
+    ins = [v for v in vertices if v.type.name == 'input']
+    outs = [v for v in vertices if v.type.name == 'output']
     inouts = ins + outs
 
     keyfun = lambda v: v.arity
@@ -88,13 +89,13 @@ def render_verilog(vertices, mod_name, path):
     io_groups = [('input', gr_ins), ('output', gr_outs)]
 
     # Group registers by driving clock.
-    regs = [v for v in vertices if v.type == 'reg']
+    regs = [v for v in vertices if v.type.name == 'reg']
     regs_per_clk = groupby_sort(regs, lambda v: v.predecessors[0].name)
 
     internal_wires = [v for v in vertices
-                      if v.type not in {'input', 'output', 'reg'}]
+                      if v.type.name not in {'input', 'output', 'reg'}]
 
-    output_wires = [v for v in vertices if v.type == 'output']
+    output_wires = [v for v in vertices if v.type.name == 'output']
 
     kwargs = {
         'inouts' : inouts,
@@ -103,7 +104,6 @@ def render_verilog(vertices, mod_name, path):
         'output_wires' : output_wires,
         'regs_per_clk' : regs_per_clk,
         'mod_name' : mod_name,
-        'WIRE_OWNERS' : WIRE_OWNERS
     }
     render_tmpl_to_file('module.v', path / f'{mod_name}.v', **kwargs)
 
@@ -123,9 +123,9 @@ def render_fmts(vs, ind):
     colors = {
         'input' : 36,
         'output' : 33,
-        None : 37
     }
-    fmts = [ansi_escape(fmt_arity(v, ind), 1, colors[v.type])
+    fmts = [ansi_escape(fmt_arity(v, ind), 1,
+                        colors[v.type.name] if v.type else 37)
             for v in vs]
     return ' '.join(fmts)
 
@@ -136,8 +136,8 @@ def render_args(vs, quote):
     return ', '.join(args)
 
 def render_verilog_tb(vertices, tests, mod_name, path):
-    ins = [v for v in vertices if v.type == 'input']
-    outs = [v for v in vertices if v.type == 'output']
+    ins = [v for v in vertices if v.type.name == 'input']
+    outs = [v for v in vertices if v.type.name == 'output']
     inouts = ins + outs
 
     keyfun = lambda v: v.arity
@@ -172,25 +172,26 @@ def render_verilog_tb(vertices, tests, mod_name, path):
 def infer_arity_fwd(v):
     if v.arity:
         return False
+    tp = v.type.name
     ps = [p for p in v.predecessors]
     arities = [p.arity for p in ps]
-    if v.type in {'if', 'reg'}:
+    if tp in {'if', 'reg'}:
         arities = arities[1:]
         ps = ps[1:]
-    if v.type == 'cat':
+    if tp == 'cat':
         if all(arities):
             v.arity = sum(arities)
             return True
-    elif v.type == 'slice':
+    elif tp == 'slice':
         hi = int(ps[1].value)
         lo = int(ps[2].value)
         v.arity = hi - lo + 1
         return True
-    elif v.type in {'if', 'reg'} | ARITH_OPS | UNARY_OPS:
+    elif tp in {'if', 'reg'} | ARITH_OPS | UNARY_OPS:
         if len(set(arities)) == 1 and arities[0]:
             v.arity = arities[0]
             return True
-    elif v.type in COMPARE_OPS:
+    elif tp in COMPARE_OPS:
         v.arity = 1
         return True
     return False
@@ -207,7 +208,7 @@ def assert_arity(v, arity):
 
 def infer_arity_bwd(v):
     data_ps = v.predecessors
-    tp = v.type
+    tp = v.type.name
     arity = v.arity
     if tp in {'if', 'reg', 'slice'}:
         data_ps = data_ps[1:]
@@ -221,7 +222,7 @@ def infer_arity_bwd(v):
             changed = assert_arity(v2, ar1)
         if ar2:
             changed = changed or assert_arity(v1, ar2)
-        if v.type == 'slice':
+        if tp == 'slice':
             for p in data_ps:
                 if len(set(p.successors)) == 1 and not p.arity:
                     p.arity = DEFAULT_INT_ARITY
@@ -244,36 +245,114 @@ def infer_arities(vertices):
         for v in vertices:
             changed = changed or infer_arity_bwd(v)
 
+    missing = [v for v in vertices if not v.arity]
+    fmt = 'Cannot infer arities for %s. Explicit declaration necessary.'
+    if missing:
+        raise ValueError(fmt % ', '.join(v.name for v in missing))
 
-def main():
-    circuit_path, test_path = [Path(p) for p in argv[1:]]
-    circuit_name = circuit_path.stem
-    circuit = load_json(circuit_path)
+def vertex_get(vertices, name):
+    v = vertices.get(name)
+    if not v:
+        raise ValueError(f'Missing vertex: {name}')
+    return v
+
+def type_get(types, name):
+    tp = types.get(name)
+    if not tp:
+        raise ValueError(f'Missing type: {name}')
+    return tp
+
+class Type:
+    def __init__(self, name, input, output, verilog_node):
+        self.name = name
+        self.input = input
+        self.output = output
+        self.verilog_node = verilog_node
+
+    def __repr__(self):
+        fmt = '%s[(%s -> %s)]'
+        args = self.name, ', '.join(self.input), ', '.join(self.output)
+        return fmt % args
+
+
+def load_types(path):
+    print(f'Loading types from {path}.')
+    d1 = load_json(path)
+    types = {}
+    for n, d2 in d1.items():
+        print(n)
+        types[n] = Type(
+            n,
+            d2['input'], d2['output'],
+            bool(d2['verilog_node'])
+        )
+    return types
+
+def load_circuit(path, types):
+    print(f'Loading circuit from {path}.')
+    circuit = load_json(path)
     vertices = {}
-    for tp, ns in circuit['types'].items():
+    for tp_name, ns in circuit['types'].items():
+        tp = type_get(types, tp_name)
         for n in ns:
-            vertices[n] = Vertex(n, None, None, None)
-            vertices[n].type = tp
+            vertices[n] = Vertex(n, tp, None, None)
     for ar, ns in circuit['arities'].items():
         ar = int(ar)
         for n in ns:
-            vertices[n].arity = ar
+            vertex_get(vertices, n).arity = ar
     for n, ps in circuit['predecessors'].items():
-        ps = [vertices[p] for p in ps]
+        ps = [vertex_get(vertices, p) for p in ps]
         v = vertices[n]
         v.predecessors = ps
         for p in ps:
             p.successors.append(v)
-    for n, v in circuit['values'].items():
+    for n, v in circuit.get('values', {}).items():
         vertices[n].value = v
 
-    for n, v in circuit['aliases'].items():
+    for n, v in circuit.get('aliases', {}).items():
         vertices[n].alias = v
+    return sorted(vertices.values(),
+                  key = lambda v: (v.type.name, v.arity, v.name))
 
-    vertices = sorted(vertices.values(),
-                      key = lambda v: (v.type, v.arity, v.name))
+def check_vertex(v):
+    tp, n = v.type, v.name
+    disc = tp.input[len(v.predecessors):]
+    fmt = 'Vertex %s has disconnected inputs: %s'
+    if disc:
+        raise ValueError(fmt % (n, ', '.join(disc)))
+
+    fmt = 'Constant %s has no value'
+    if tp.name == 'const' and v.value is None:
+        raise ValueError(fmt % n)
+
+    fmt = 'Vertex %s has disconnected outputs: %s'
+    if tp.output and not v.successors:
+        raise ValueError(fmt % (n, ', '.join(tp.output)))
+
+
+
+def check_vertices(vertices):
+    for v in vertices:
+        check_vertex(v)
+
+
+
+
+
+
+def main():
+    types_path, circuit_path, test_path = [Path(p) for p in argv[1:]]
+    circuit_name = circuit_path.stem
+
+    types = load_types(types_path)
+
+    vertices = load_circuit(circuit_path, types)
+
+
+
+    check_vertices(vertices)
+
     infer_arities(vertices)
-
     for v in vertices:
         if not v.arity:
             print(v)
@@ -288,7 +367,10 @@ def main():
 
     render_verilog_tb(vertices, tests, circuit_name, OUTPUT)
 
+    path = OUTPUT / f'{circuit_name}.png'
+    plot_vertices(vertices, path, False, False, False)
     vertices = internalize_vertices(vertices)
-    plot_vertices(vertices, OUTPUT / f'{circuit_name}.png', False, False)
+    path = OUTPUT / f'{circuit_name}_simplified.png'
+    plot_vertices(vertices, path, False, False, True)
 
 main()

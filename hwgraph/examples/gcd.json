@@ -15,7 +15,7 @@
 
         // Negations
         "not_p" : ["reg_p"],
-        "not_rstn" : ["rstn"],
+        //"not_rstn" : ["rstn"],
 
         // Comparisions and subtraction
         "x_ge_y" : ["sl_x_fr_xy", "sl_y_fr_xy"],
@@ -25,12 +25,13 @@
         // And gates
         "begin_p" : ["in_valid", "not_p"],
         "y_eq_0_and_p" : ["y_eq_0", "reg_p"],
+        "p_next" : ["rstn", "p_next2"],
 
         // Five muxes
         "next" : ["begin_p", "cat_ab", "next3"],
         "next3" : ["x_ge_y", "cat_yx", "cat_x_y_sub_x"],
 
-        "p_next" : ["not_rstn", "c0_1", "p_next2"],
+        //"p_next" : ["not_rstn", "c0_1", "p_next2"],
         "p_next2" : ["begin_p", "c1_1", "p_next3"],
         "p_next3" : ["y_eq_0", "c0_1", "reg_p"],
 
@@ -65,11 +66,11 @@
         "reg" : ["reg_p", "reg_xy"],
 
         // Logic
-        "and" : ["begin_p", "y_eq_0_and_p"],
-        "not" : ["not_p", "not_rstn"],
+        "and" : ["begin_p", "y_eq_0_and_p", "p_next"],
+        "not" : ["not_p"],
 
         // Muxes
-        "if" : ["p_next", "p_next2", "p_next3", "next", "next3"],
+        "if" : ["p_next2", "p_next3", "next", "next3"],
 
         // Arith
         "ge" : ["x_ge_y"],

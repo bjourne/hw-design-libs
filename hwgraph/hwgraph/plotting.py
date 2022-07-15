@@ -20,9 +20,10 @@ def clone_simple_vertices(vertices):
     # Duplicate some trivial nodes.
     clones = []
     for v1 in vertices:
-        tp = v1.type
+        tp = v1.type.name
         if any(v1.predecessors):
             continue
+        # What about comparisons?
         if tp in {'eq', 'const', 'input'} | UNARY_OPS | BINARY_OPS:
             hd, tl = v1.successors[0], v1.successors[1:]
             if tl:
@@ -42,11 +43,11 @@ def internalize_vertices(vertices):
         all_removed = []
         for v in vertices:
             removed = []
-            tp = v.type
+            tp = v.type.name
             if tp in {'cat', 'slice', 'if'} | BINARY_OPS | UNARY_OPS:
                 for i, p in enumerate(list(v.predecessors)):
                     if (p and
-                        p.type in INTERNALIZABLE_TYPES and
+                        p.type.name in INTERNALIZABLE_TYPES and
                         not any(p.predecessors) and
                         len(set(p.successors)) == 1):
                         v.internalized[i] = p
@@ -66,7 +67,7 @@ def colorize(s, col):
     return '<font color="%s">%s</font>' % (col, s)
 
 def render_label(v, parent_tp):
-    tp = v.type
+    tp = v.type.name
     sym = escape(TYPE_TO_SYMBOL.get(tp, ''))
     preds = v.predecessors
     interns = v.internalized
@@ -123,8 +124,8 @@ def render_label(v, parent_tp):
         assert False
     return label
 
-def style_node(v, draw_arities):
-    n, tp = v.name, v.type
+def style_node(v, draw_arities, draw_aliases):
+    n, tp = v.name, v.type.name
 
     shape = 'box'
     width = height = 0.55
@@ -143,7 +144,7 @@ def style_node(v, draw_arities):
     elif tp == 'reg':
         fillcolor = '#ffffdd'
 
-    if v.alias:
+    if v.alias and draw_aliases:
         var = colorize(v.alias, '#6ca471')
         label = f'{var} &larr; {label}'
 
@@ -161,12 +162,13 @@ def style_edge(pt, v1, v2):
     color = 'black'
     style = 'solid'
     penwidth = 0.5
-    if v2.type == 'if':
+    tp2 = v2.type.name
+    if tp2 == 'if':
         if pt == 1:
             color = 'black;0.9999:#00aa00'
         elif pt == 2:
             color = 'black;0.9999:#aa0000'
-    elif v2.type == 'reg':
+    elif tp2 == 'reg':
         if pt == 0:
             style = 'dashed'
     if v1.arity != 1:
@@ -199,7 +201,8 @@ def setup_graph():
     G.edge_attr.update(edge_attrs)
     return G
 
-def plot_vertices(vertices, png_path, draw_clk, draw_arities):
+def plot_vertices(vertices, png_path,
+                  draw_clk, draw_arities, draw_aliases):
     G = setup_graph()
 
     # Vertices names are not always unique.
@@ -207,7 +210,7 @@ def plot_vertices(vertices, png_path, draw_clk, draw_arities):
 
     for v in vertices:
         if v.name != 'clk' or draw_clk:
-            attrs = style_node(v, draw_arities)
+            attrs = style_node(v, draw_arities, draw_aliases)
             G.add_node(ids[v], **attrs)
 
     for v2 in vertices:
