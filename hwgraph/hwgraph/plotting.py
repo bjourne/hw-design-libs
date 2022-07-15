@@ -54,7 +54,7 @@ def internalize_vertices(vertices):
                         v.predecessors[i] = None
                         removed.append(p)
                         changed = True
-                    if p and p.alias:
+                    if p and p.refer_by_name:
                         v.internalized[i] = p
                         v.predecessors[i] = None
                         p.successors.remove(v)
@@ -67,12 +67,13 @@ def colorize(s, col):
     return '<font color="%s">%s</font>' % (col, s)
 
 def render_label(v, parent_tp):
+    n = v.name
     tp = v.type.name
     sym = escape(TYPE_TO_SYMBOL.get(tp, ''))
     preds = v.predecessors
     interns = v.internalized
-    if parent_tp and v.alias:
-        return colorize(v.alias, '#6ca471')
+    if parent_tp and v.refer_by_name:
+        return colorize(n, '#6ca471')
     elif tp == 'slice':
         if interns:
             return f'[{interns[1].value}:{interns[2].value}]'
@@ -80,11 +81,11 @@ def render_label(v, parent_tp):
     elif tp == 'const':
         return f'{v.value}'
     elif tp == 'reg':
-        return v.name
+        return tp
     elif tp == 'input':
-        return colorize(v.name, '#aa8888')
+        return colorize(n, '#aa8888')
     elif tp == 'output':
-        return colorize(v.name, '#7788aa')
+        return colorize(n, '#7788aa')
     elif tp in UNARY_OPS:
         if interns:
             x = render_label(interns[0], tp)
@@ -124,7 +125,7 @@ def render_label(v, parent_tp):
         assert False
     return label
 
-def style_node(v, draw_arities, draw_aliases):
+def style_node(v, draw_arities, draw_names):
     n, tp = v.name, v.type.name
 
     shape = 'box'
@@ -144,8 +145,8 @@ def style_node(v, draw_arities, draw_aliases):
     elif tp == 'reg':
         fillcolor = '#ffffdd'
 
-    if v.alias and draw_aliases:
-        var = colorize(v.alias, '#6ca471')
+    if v.refer_by_name and draw_names:
+        var = colorize(n, '#6ca471')
         label = f'{var} &larr; {label}'
 
     if draw_arities:
@@ -202,7 +203,7 @@ def setup_graph():
     return G
 
 def plot_vertices(vertices, png_path,
-                  draw_clk, draw_arities, draw_aliases):
+                  draw_clk, draw_arities, draw_names):
     G = setup_graph()
 
     # Vertices names are not always unique.
@@ -210,7 +211,7 @@ def plot_vertices(vertices, png_path,
 
     for v in vertices:
         if v.name != 'clk' or draw_clk:
-            attrs = style_node(v, draw_arities, draw_aliases)
+            attrs = style_node(v, draw_arities, draw_names)
             G.add_node(ids[v], **attrs)
 
     for v2 in vertices:

@@ -2,17 +2,17 @@
     "input" : {
         "input" : [],
         "output" : ["o"],
-        "verilog_node" : false
+        "refer_by_name" : false
     },
     "output" : {
         "input" : ["i"],
         "output" : [],
-        "verilog_node" : true
+        "refer_by_name" : true
     },
     "const" : {
         "input" : [],
         "output" : ["o"],
-        "verilog_node" : false
+        "refer_by_name" : false
     },
     // Structural
     "cat" : {
@@ -21,12 +21,12 @@
         "arity_constraints" : [
             ["equals", ["add", "i1", "i2"], "o"]
         ],
-        "verilog_node" : false
+        "refer_by_name" : false
     },
     "slice" : {
         "input" : ["bits", "hi", "lo"],
         "output" : ["o"],
-        "verilog_node" : false
+        "refer_by_name" : false
     },
     // Logic
     "not" : {
@@ -35,7 +35,7 @@
         "arity_constraints" : [
             ["equals", "i", "o"]
         ],
-        "verilog_node" : false
+        "refer_by_name" : false
     },
 
     // Comparisons
@@ -46,7 +46,7 @@
             ["equals", "o", 1],
             ["equals", "i1", "i2"]
         ],
-        "verilog_node" : false
+        "refer_by_name" : false
     },
     "ge" : {
         "input": ["i1", "i2"],
@@ -55,7 +55,7 @@
             ["equals", "o", 1],
             ["equals", "i1", "i2"]
         ],
-        "verilog_node" : false
+        "refer_by_name" : false
     },
     "and" : {
         "input": ["i1", "i2"],
@@ -64,7 +64,7 @@
             ["equals", "i1", "i2"],
             ["equals", "i2", "o"]
         ],
-        "verilog_node" : false
+        "refer_by_name" : false
     },
     "sub" : {
         "input": ["i1", "i2"],
@@ -73,7 +73,7 @@
             ["equals", "i1", "i2"],
             ["equals", "i2", "o"]
         ],
-        "verilog_node" : false
+        "refer_by_name" : false
     },
     "if" : {
         "input" : ["c", "i1", "i2"],
@@ -83,7 +83,7 @@
             ["equals", "i2", "o"],
             ["equals", "c", 1]
         ],
-        "verilog_node" : true
+        "refer_by_name" : true
     },
     "reg" : {
         "input" : ["clk", "i"],
@@ -92,6 +92,6 @@
             ["equals", "clk", 1],
             ["equals", "i", "o"]
         ],
-        "verilog_node" : true
+        "refer_by_name" : true
     }
 }

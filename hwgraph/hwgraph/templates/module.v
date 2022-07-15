@@ -16,7 +16,7 @@ module {{ mod_name }} ({{ inouts|map(attribute='name')|join(', ')  }});
     always @(posedge {{ clk }}) begin
         {%- for v in regs %}
         {%- set inp = v.predecessors[1] %}
-        {%- if inp.type.verilog_node %}
+        {%- if inp.type.refer_by_name %}
         {{ v.name }} <= {{ inp.name }};
         {%- else %}
         {{ v.name }} <= {{ render_rval(inp, None) }};
@@ -26,14 +26,15 @@ module {{ mod_name }} ({{ inouts|map(attribute='name')|join(', ')  }});
     {%- endfor %}
 
     // Internal wires
-    {%- for v in internal_wires %}
-    {%- if v.type.verilog_node %}
+    {%- for v in explicitly_named %}
     {{ render_lval('wire', v) }} = {{ render_rval(v, None) }};
-    {%- endif %}
+    {%- endfor %}
+    {% for v in implicitly_named %}
+    {{ render_lval('wire', v) }} = {{ render_rval(v, None) }};
     {%- endfor %}
 
     // Output wires
-    {%- for v in output_wires %}
+    {%- for v in outputs %}
     {{ render_lval('wire', v) }} = {{ render_rval(v, None) }};
     {%- endfor %}
 endmodule

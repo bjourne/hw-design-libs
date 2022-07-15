@@ -7,7 +7,7 @@ class Vertex:
         self.arity = arity
         self.predecessors = []
         self.value = value
-        self.alias = None
+        self.refer_by_name = False
 
         # We don't yet support vertices with multiple outputs.
         self.successors = []

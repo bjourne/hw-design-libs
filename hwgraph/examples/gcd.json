@@ -1,43 +1,42 @@
 {
     "predecessors" : {
         // Slices
-        "sl_y_fr_xy" : ["reg_xy", "c7_8", "c0_8"],
-        "sl_x_fr_xy" : ["reg_xy", "c15_8", "c8_8"],
+        "y" : ["reg_xy", "c7_8", "c0_8"],
+        "x" : ["reg_xy", "c15_8", "c8_8"],
 
         // Registers
-        "reg_p" : ["clk", "p_next"],
+        "p" : ["clk", "p_next"],
         "reg_xy" : ["clk", "next"],
 
         // Concatenations
-        "cat_yx" : ["sl_y_fr_xy", "sl_x_fr_xy"],
+        "cat_yx" : ["y", "x"],
         "cat_ab" : ["a", "b"],
-        "cat_x_y_sub_x" : ["sl_x_fr_xy", "y_sub_x"],
+        "cat_x_y_sub_x" : ["x", "y_sub_x"],
 
         // Negations
-        "not_p" : ["reg_p"],
+        "not_p" : ["p"],
         //"not_rstn" : ["rstn"],
 
         // Comparisions and subtraction
-        "x_ge_y" : ["sl_x_fr_xy", "sl_y_fr_xy"],
-        "y_eq_0" : ["sl_y_fr_xy", "c0_8"],
-        "y_sub_x" : ["sl_y_fr_xy", "sl_x_fr_xy"],
+        "x_ge_y" : ["x", "y"],
+        "y_eq_0" : ["y", "c0_8"],
+        "y_sub_x" : ["y", "x"],
 
         // And gates
         "begin_p" : ["in_valid", "not_p"],
-        "y_eq_0_and_p" : ["y_eq_0", "reg_p"],
+        "y_eq_0_and_p" : ["y_eq_0", "p"],
         "p_next" : ["rstn", "p_next2"],
 
         // Five muxes
         "next" : ["begin_p", "cat_ab", "next3"],
         "next3" : ["x_ge_y", "cat_yx", "cat_x_y_sub_x"],
 
-        //"p_next" : ["not_rstn", "c0_1", "p_next2"],
         "p_next2" : ["begin_p", "c1_1", "p_next3"],
-        "p_next3" : ["y_eq_0", "c0_1", "reg_p"],
+        "p_next3" : ["y_eq_0", "c0_1", "p"],
 
         // Output variables
         "in_ready" : ["not_p"],
-        "o" : ["sl_x_fr_xy"],
+        "o" : ["x"],
         "out_valid" : ["y_eq_0_and_p"]
     },
     "arities" : {
@@ -52,18 +51,14 @@
         "c8_8" : 8,
         "c15_8" : 15
     },
-    "aliases" : {
-        "sl_x_fr_xy" : "x",
-        "sl_y_fr_xy" : "y",
-        "reg_p" : "p"
-    },
+    "refer_by_name" : ["x", "y", "p"],
     "types" : {
         "input" : ["clk", "rstn", "a", "b", "in_valid"],
         "output" : ["in_ready", "out_valid", "o"],
         "const" : ["c0_1", "c0_8", "c1_1", "c7_8", "c8_8", "c15_8"],
 
         // Flip flops
-        "reg" : ["reg_p", "reg_xy"],
+        "reg" : ["p", "reg_xy"],
 
         // Logic
         "and" : ["begin_p", "y_eq_0_and_p", "p_next"],
@@ -81,6 +76,6 @@
         "cat" : ["cat_ab", "cat_yx", "cat_x_y_sub_x"],
 
         // Slices
-        "slice" : ["sl_x_fr_xy", "sl_y_fr_xy"]
+        "slice" : ["x", "y"]
     }
 }

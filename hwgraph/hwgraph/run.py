@@ -30,24 +30,26 @@ def render_lval(lval_tp, v):
     return f'{lval_tp} [{v.arity - 1}:0] {v.name}'
 
 def render_rval(v1, parent_tp):
-    r_args = []
+    def render_rval_pred(v, parent_tp):
+        if v.refer_by_name or v.type.refer_by_name:
+            return v.name
+        return render_rval(v, parent_tp)
     tp = v1.type.name
     sym = TYPE_TO_SYMBOL.get(tp)
-    for v2 in v1.predecessors:
-        r_arg = v2.name
-        if not v2.type.verilog_node:
-            r_arg = render_rval(v2, tp)
-        r_args.append(r_arg)
+
+    r_args = [render_rval_pred(v2, tp) for v2 in v1.predecessors]
+    r_args = tuple(r_args)
     if tp == 'const':
         if parent_tp == 'cat':
             return f"{v1.arity}'b{v1.value}"
         return f'{v1.value}'
     elif tp == 'if':
-        return '%s\n        ? %s\n        : %s' % tuple(r_args)
+        return '%s ? %s : %s' % r_args
+        # return '%s\n        ? %s\n        : %s' % tuple(r_args)
     elif tp == 'cat':
         return '{%s}' % ', '.join(r_args)
     elif tp == 'slice':
-        return '%s[%s:%s]' % tuple(r_args)
+        return '%s[%s:%s]' % r_args
     elif tp in BINARY_OPS:
         s = f'{r_args[0]} {sym} {r_args[1]}'
         if parent_tp in BINARY_OPS:
@@ -75,33 +77,35 @@ def load_json(fname):
 def groupby_sort(seq, keyfun):
     grps = groupby(seq, keyfun)
     grps = [(k, list(v)) for k, v in grps]
-    print(grps)
     return sorted(grps)
 
 def render_verilog(vertices, mod_name, path):
-    ins = [v for v in vertices if v.type.name == 'input']
-    outs = [v for v in vertices if v.type.name == 'output']
-    inouts = ins + outs
+    vs_by_type = dict(groupby_sort(vertices, lambda v: v.type.name))
 
     keyfun = lambda v: v.arity
-    gr_ins = groupby_sort(ins, keyfun)
-    gr_outs = groupby_sort(outs, keyfun)
+    gr_ins = groupby_sort(vs_by_type['input'], keyfun)
+    gr_outs = groupby_sort(vs_by_type['output'], keyfun)
     io_groups = [('input', gr_ins), ('output', gr_outs)]
 
     # Group registers by driving clock.
-    regs = [v for v in vertices if v.type.name == 'reg']
+    regs = vs_by_type['reg']
     regs_per_clk = groupby_sort(regs, lambda v: v.predecessors[0].name)
 
-    internal_wires = [v for v in vertices
-                      if v.type.name not in {'input', 'output', 'reg'}]
+    internal = [v for v in vertices
+                if v.type.name not in {'input', 'output', 'reg'}]
+    explicitly_named = [v for v in internal if v.refer_by_name]
+    implicitly_named = [v for v in internal
+                        if v.type.refer_by_name and not v.refer_by_name]
 
-    output_wires = [v for v in vertices if v.type.name == 'output']
+    # Outputs
+    outputs = vs_by_type['output']
 
     kwargs = {
-        'inouts' : inouts,
+        'inouts' : vs_by_type['input'] + vs_by_type['output'],
         'io_groups' : io_groups,
-        'internal_wires' :  internal_wires,
-        'output_wires' : output_wires,
+        'explicitly_named' :  explicitly_named,
+        'implicitly_named' : implicitly_named,
+        'outputs' : outputs,
         'regs_per_clk' : regs_per_clk,
         'mod_name' : mod_name,
     }
@@ -263,11 +267,11 @@ def type_get(types, name):
     return tp
 
 class Type:
-    def __init__(self, name, input, output, verilog_node):
+    def __init__(self, name, input, output, refer_by_name):
         self.name = name
         self.input = input
         self.output = output
-        self.verilog_node = verilog_node
+        self.refer_by_name = refer_by_name
 
     def __repr__(self):
         fmt = '%s[(%s -> %s)]'
@@ -284,7 +288,7 @@ def load_types(path):
         types[n] = Type(
             n,
             d2['input'], d2['output'],
-            bool(d2['verilog_node'])
+            d2['refer_by_name']
         )
     return types
 
@@ -309,8 +313,8 @@ def load_circuit(path, types):
     for n, v in circuit.get('values', {}).items():
         vertices[n].value = v
 
-    for n, v in circuit.get('aliases', {}).items():
-        vertices[n].alias = v
+    for n in circuit['refer_by_name']:
+        vertices[n].refer_by_name = True
     return sorted(vertices.values(),
                   key = lambda v: (v.type.name, v.arity, v.name))
 
@@ -329,16 +333,9 @@ def check_vertex(v):
     if tp.output and not v.successors:
         raise ValueError(fmt % (n, ', '.join(tp.output)))
 
-
-
 def check_vertices(vertices):
     for v in vertices:
         check_vertex(v)
-
-
-
-
-
 
 def main():
     types_path, circuit_path, test_path = [Path(p) for p in argv[1:]]
