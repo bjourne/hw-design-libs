@@ -371,12 +371,9 @@ def main():
     render_verilog_tb(vertices, tests, circuit_name, OUTPUT)
 
     path = OUTPUT / f'{circuit_name}.png'
-    plot_vertices(vertices, path, False, False, False)
+    plot_vertices(vertices, path, True, True, True)
 
-
-    #vertices = internalize_vertices(vertices)
     path = OUTPUT / f'{circuit_name}_statements.png'
     plot_statements(vertices, path)
-    #plot_vertices(vertices, path, False, False, True)
 
 main()

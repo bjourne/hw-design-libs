@@ -22,42 +22,39 @@ TYPE_TO_SIZE = {
     'const' : 0.3,
     None : 0.55
 }
+IF_EDGE_ARROWHEAD_COLORS = {0 : 'black', 1 : '#00aa00', 2 : '#aa0000'}
 
 def colorize(s, col):
     return '<font color="%s">%s</font>' % (col, s)
 
-def render_label(v, parent_tp):
+def draw_label(v, draw_arities, draw_names):
     n = v.name
     tp = v.type.name
-    if parent_tp and v.refer_by_name:
-        return colorize(n, TYPE_TO_NAME_COLOR[None])
-    elif tp in {'slice', 'reg', 'if', 'cat'}:
-        return tp
+    if tp in {'slice', 'reg', 'if', 'cat'}:
+        label = tp
     elif tp == 'const':
-        return f'{v.value}'
+        label = f'{v.value}'
     elif tp in {'input', 'output'}:
-        return colorize(n, TYPE_TO_NAME_COLOR[tp])
+        label = colorize(n, TYPE_TO_NAME_COLOR[tp])
     elif tp in UNARY_OPS | BINARY_OPS:
-        return escape(TYPE_TO_SYMBOL.get(tp, ''))
-    assert False
+        label = escape(TYPE_TO_SYMBOL.get(tp, ''))
+    else:
+        assert False
+    if v.refer_by_name and draw_names:
+        var = colorize(n, TYPE_TO_NAME_COLOR[None])
+        label = f'{var} &larr; {label}'
+    if draw_arities:
+        label = f'{label}:{v.arity or "?"}'
+    return f'<{label}>'
 
-def style_node(v, draw_arities, draw_names):
+def style_node(v):
     n, tp = v.name, v.type.name
 
     shape = TYPE_TO_SHAPE.get(tp, TYPE_TO_SHAPE[None])
     fillcolor = TYPE_TO_FILLCOLOR.get(tp, TYPE_TO_FILLCOLOR[None])
     width = height = TYPE_TO_SIZE.get(tp, TYPE_TO_SIZE[None])
 
-    label = render_label(v, None)
-    if v.refer_by_name and draw_names:
-        var = colorize(n, TYPE_TO_NAME_COLOR[None])
-        label = f'{var} &larr; {label}'
-
-    if draw_arities:
-        label = f'{label}:{v.arity or "?"}'
-
     return {'shape' : shape,
-            'label' : f'<{label}>',
             'width' : width,
             'height' : height,
             'color' : 'black',
@@ -66,11 +63,10 @@ def style_node(v, draw_arities, draw_names):
 def style_edge(pt, v1, v2):
     color = 'black'
     style = 'solid'
-    to_if_col = {1 : '#00aa00', 2 : '#aa0000', None : 'black'}
     penwidth = 0.5
     tp2 = v2.type.name
     if tp2 == 'if':
-        color = 'black;0.9999:%s' % to_if_col.get(pt, to_if_col[None])
+        color = f'black;0.9999:%s' % IF_EDGE_ARROWHEAD_COLORS[pt]
     elif tp2 == 'reg':
         if pt == 0:
             style = 'dashed'
@@ -108,19 +104,17 @@ def plot_vertices(vertices, png_path,
                   draw_clk, draw_arities, draw_names):
     G = setup_graph()
 
-    # Vertices names are not always unique.
-    ids = {v : i for i, v in enumerate(vertices)}
-
     for v in vertices:
         if v.name != 'clk' or draw_clk:
-            attrs = style_node(v, draw_arities, draw_names)
-            G.add_node(ids[v], **attrs)
+            G.add_node(v.name,
+                       label = draw_label(v, draw_arities, draw_names),
+                       **style_node(v))
 
     for v2 in vertices:
         for i, v1 in enumerate(v2.predecessors):
             if v1 and v1.name != 'clk' or draw_clk:
                 attrs = style_edge(i, v1, v2)
-                G.add_edge(ids[v1], ids[v2], **attrs)
+                G.add_edge(v1.name, v2.name, **attrs)
     G.draw(png_path, prog='dot')
 
 def statement_label(v, parent, root, edges):
@@ -166,26 +160,13 @@ def statement_label(v, parent, root, edges):
         return '%s ? %s : %s' % rendered_ps
     assert False
 
-def style_statement_node(v, edges):
+def draw_statement_label(v, edges):
     label = statement_label(v, None, v, edges)
     if v.refer_by_name or v.type.name == 'output':
         col = TYPE_TO_NAME_COLOR.get(v.type.name, TYPE_TO_NAME_COLOR[None])
         var = colorize(v.name, col)
         label = f'{var} &larr; {label}'
-
-    tp = v.type.name
-    shape = TYPE_TO_SHAPE.get(tp, TYPE_TO_SHAPE[None])
-    fillcolor = TYPE_TO_FILLCOLOR.get(tp, TYPE_TO_FILLCOLOR[None])
-    width = height = TYPE_TO_SIZE.get(tp, TYPE_TO_SIZE[None])
-    color = 'black'
-    return {
-        'shape' : shape,
-        'label' : f'<{label}>',
-        'width' : width,
-        'height' : height,
-        'color' : color,
-        'fillcolor' : fillcolor
-    }
+    return f'<{label}>'
 
 def plot_statements(vertices, png_path):
     G = setup_graph()
@@ -195,14 +176,14 @@ def plot_statements(vertices, png_path):
                 if (v.type.name in {'reg', 'if', 'output'} or
                     v.refer_by_name) and v.name != 'clk']
 
-    # Vertices names are not always unique.
-    ids = {v : i for i, v in enumerate(vertices)}
     edges = set()
     for v in vertices:
-        attrs = style_statement_node(v, edges)
-        G.add_node(ids[v], **attrs)
+        label = draw_statement_label(v, edges)
+        G.add_node(v.name,
+                   label = label,
+                   **style_node(v))
     for v1, v2, i in edges:
         kw = style_edge(i, v1, v2)
-        G.add_edge(ids[v1], ids[v2], **kw)
+        G.add_edge(v1.name, v2.name, **kw)
 
     G.draw(png_path, prog='dot')
