@@ -3,65 +3,25 @@ from html import escape
 from hwgraph import UNARY_OPS, BINARY_OPS, TYPE_TO_SYMBOL, Vertex
 from pygraphviz import AGraph
 
-# Internalization... For now only used to improve plotting.
-INTERNALIZABLE_TYPES = {'cat', 'const', 'input'} | BINARY_OPS | UNARY_OPS
-
-def clone_vertex(v1):
-    v2 = Vertex(v1.name, v1.type, v1.arity, v1.value)
-    v2.internalized = v1.internalized
-    return v2
-
-def replace_vertex_pred(v, old, new):
-    idx = v.predecessors.index(old)
-    v.predecessors[idx] = new
-    new.successors.append(v)
-
-def clone_simple_vertices(vertices):
-    # Duplicate some trivial nodes.
-    clones = []
-    for v1 in vertices:
-        tp = v1.type.name
-        if any(v1.predecessors):
-            continue
-        # What about comparisons?
-        if tp in {'eq', 'const', 'input'} | UNARY_OPS | BINARY_OPS:
-            hd, tl = v1.successors[0], v1.successors[1:]
-            if tl:
-                for v2 in tl:
-                    v1p = clone_vertex(v1)
-                    replace_vertex_pred(v2, v1, v1p)
-                    clones.append(v1p)
-            v1.successors = [hd]
-    return clones
-
-def internalize_vertices(vertices):
-    changed = True
-    while changed:
-        changed = False
-        vertices.extend(clone_simple_vertices(vertices))
-
-        all_removed = []
-        for v in vertices:
-            removed = []
-            tp = v.type.name
-            if tp in {'cat', 'slice', 'if'} | BINARY_OPS | UNARY_OPS:
-                for i, p in enumerate(list(v.predecessors)):
-                    if (p and
-                        p.type.name in INTERNALIZABLE_TYPES and
-                        not any(p.predecessors) and
-                        len(set(p.successors)) == 1):
-                        v.internalized[i] = p
-                        v.predecessors[i] = None
-                        removed.append(p)
-                        changed = True
-                    if p and p.refer_by_name:
-                        v.internalized[i] = p
-                        v.predecessors[i] = None
-                        p.successors.remove(v)
-
-            all_removed.extend(removed)
-        vertices = [v for v in vertices if v not in all_removed]
-    return vertices
+TYPE_TO_NAME_COLOR = {
+    'output' : '#7788aa',
+    'input' : '#aa8888',
+    None : '#6ca471'
+}
+TYPE_TO_SHAPE = {
+    'input' : 'oval',
+    'output' : 'oval',
+    'if' : 'diamond',
+    None : 'box'
+}
+TYPE_TO_FILLCOLOR = {
+    'reg' : '#ffffdd',
+    None : 'white'
+}
+TYPE_TO_SIZE = {
+    'const' : 0.3,
+    None : 0.55
+}
 
 def colorize(s, col):
     return '<font color="%s">%s</font>' % (col, s)
@@ -69,84 +29,28 @@ def colorize(s, col):
 def render_label(v, parent_tp):
     n = v.name
     tp = v.type.name
-    sym = escape(TYPE_TO_SYMBOL.get(tp, ''))
-    preds = v.predecessors
-    interns = v.internalized
     if parent_tp and v.refer_by_name:
-        return colorize(n, '#6ca471')
-    elif tp == 'slice':
-        if interns:
-            return f'[{interns[1].value}:{interns[2].value}]'
+        return colorize(n, TYPE_TO_NAME_COLOR[None])
+    elif tp in {'slice', 'reg', 'if', 'cat'}:
         return tp
     elif tp == 'const':
         return f'{v.value}'
-    elif tp == 'reg':
-        return tp
-    elif tp == 'input':
-        return colorize(n, '#aa8888')
-    elif tp == 'output':
-        return colorize(n, '#7788aa')
-    elif tp in UNARY_OPS:
-        if interns:
-            x = render_label(interns[0], tp)
-            return f'{sym}{x}'
-        return sym
-    elif tp in BINARY_OPS:
-        if not interns:
-            return sym
-        l, r = '**'
-        if 0 in interns:
-            l = render_label(interns[0], tp)
-        if  1 in interns:
-            r = render_label(interns[1], tp)
-        s = f'{l} {sym} {r}'
-        if parent_tp in BINARY_OPS:
-            s = f'({s})'
-        return s
-    elif tp == 'if':
-        if interns:
-            cond, l, r = '***'
-            if 0 in interns:
-                cond = render_label(interns[0], tp)
-            if 1 in interns:
-                l = render_label(interns[1], tp)
-            if 2 in interns:
-                r = render_label(interns[2], True)
-            return f'{cond} ? {l} : {r}'
-        return tp
-    elif tp == 'cat':
-        if interns:
-            parts = ['*'] * len(preds)
-            for i, v2 in interns.items():
-                parts[i] = render_label(v2, tp)
-            return "{%s}" % ', '.join(parts)
-        return tp
-    else:
-        assert False
-    return label
+    elif tp in {'input', 'output'}:
+        return colorize(n, TYPE_TO_NAME_COLOR[tp])
+    elif tp in UNARY_OPS | BINARY_OPS:
+        return escape(TYPE_TO_SYMBOL.get(tp, ''))
+    assert False
 
 def style_node(v, draw_arities, draw_names):
     n, tp = v.name, v.type.name
 
-    shape = 'box'
-    width = height = 0.55
-    color = 'black'
-    fillcolor = 'white'
+    shape = TYPE_TO_SHAPE.get(tp, TYPE_TO_SHAPE[None])
+    fillcolor = TYPE_TO_FILLCOLOR.get(tp, TYPE_TO_FILLCOLOR[None])
+    width = height = TYPE_TO_SIZE.get(tp, TYPE_TO_SIZE[None])
 
     label = render_label(v, None)
-    if tp == 'const':
-        shape = 'box'
-        width = height = 0.3
-    elif tp in ('input', 'output'):
-        shape = 'oval'
-        fillcolor = '#ffcccc' if tp == 'input' else '#bbccff'
-    elif tp == 'if':
-        shape = 'diamond'
-    elif tp == 'reg':
-        fillcolor = '#ffffdd'
-
     if v.refer_by_name and draw_names:
-        var = colorize(n, '#6ca471')
+        var = colorize(n, TYPE_TO_NAME_COLOR[None])
         label = f'{var} &larr; {label}'
 
     if draw_arities:
@@ -156,19 +60,17 @@ def style_node(v, draw_arities, draw_names):
             'label' : f'<{label}>',
             'width' : width,
             'height' : height,
-            'color' : color,
+            'color' : 'black',
             'fillcolor' : fillcolor}
 
 def style_edge(pt, v1, v2):
     color = 'black'
     style = 'solid'
+    to_if_col = {1 : '#00aa00', 2 : '#aa0000', None : 'black'}
     penwidth = 0.5
     tp2 = v2.type.name
     if tp2 == 'if':
-        if pt == 1:
-            color = 'black;0.9999:#00aa00'
-        elif pt == 2:
-            color = 'black;0.9999:#aa0000'
+        color = 'black;0.9999:%s' % to_if_col.get(pt, to_if_col[None])
     elif tp2 == 'reg':
         if pt == 0:
             style = 'dashed'
@@ -219,4 +121,88 @@ def plot_vertices(vertices, png_path,
             if v1 and v1.name != 'clk' or draw_clk:
                 attrs = style_edge(i, v1, v2)
                 G.add_edge(ids[v1], ids[v2], **attrs)
+    G.draw(png_path, prog='dot')
+
+def statement_label(v, parent, root, edges):
+    def render_pred(v, parent, edges):
+        if v.refer_by_name:
+            tp = v.type.name
+            col = TYPE_TO_NAME_COLOR.get(tp, TYPE_TO_NAME_COLOR[None])
+            return colorize(v.name, col)
+        if v.type.name in {'if', 'reg'}:
+            edges.add((v, root, parent.predecessors.index(v)))
+            return '*'
+        return statement_label(v, parent, root, edges)
+
+    name = v.name
+    tp = v.type.name
+    ps = v.predecessors
+    sym = escape(TYPE_TO_SYMBOL.get(tp, ''))
+    parent_tp = parent.type.name if parent else None
+    rendered_ps = tuple([render_pred(p, v, edges) for p in ps])
+    if tp == 'slice':
+        return '[%s:%s]' % (rendered_ps[1], rendered_ps[2])
+    elif tp == 'reg':
+        return rendered_ps[1]
+    elif tp == 'const':
+        return f'{v.value}'
+    elif tp == 'output':
+        return rendered_ps[0]
+    elif tp == 'input':
+        return colorize(name, TYPE_TO_NAME_COLOR[tp])
+    elif tp in UNARY_OPS:
+        return '%s%s' % (sym, rendered_ps[0])
+    elif tp in BINARY_OPS:
+        s = '%s %s %s' % (rendered_ps[0], sym, rendered_ps[1])
+        if parent_tp in BINARY_OPS:
+            s = f'({s})'
+        return s
+    elif tp == 'cat':
+        s = '%s, %s' % (rendered_ps[0], rendered_ps[1])
+        if parent_tp != 'cat':
+            s = '{%s}' % s
+        return s
+    elif tp == 'if':
+        return '%s ? %s : %s' % rendered_ps
+    assert False
+
+def style_statement_node(v, edges):
+    label = statement_label(v, None, v, edges)
+    if v.refer_by_name or v.type.name == 'output':
+        col = TYPE_TO_NAME_COLOR.get(v.type.name, TYPE_TO_NAME_COLOR[None])
+        var = colorize(v.name, col)
+        label = f'{var} &larr; {label}'
+
+    tp = v.type.name
+    shape = TYPE_TO_SHAPE.get(tp, TYPE_TO_SHAPE[None])
+    fillcolor = TYPE_TO_FILLCOLOR.get(tp, TYPE_TO_FILLCOLOR[None])
+    width = height = TYPE_TO_SIZE.get(tp, TYPE_TO_SIZE[None])
+    color = 'black'
+    return {
+        'shape' : shape,
+        'label' : f'<{label}>',
+        'width' : width,
+        'height' : height,
+        'color' : color,
+        'fillcolor' : fillcolor
+    }
+
+def plot_statements(vertices, png_path):
+    G = setup_graph()
+
+    # Vertices to draw
+    vertices = [v for v in vertices
+                if (v.type.name in {'reg', 'if', 'output'} or
+                    v.refer_by_name) and v.name != 'clk']
+
+    # Vertices names are not always unique.
+    ids = {v : i for i, v in enumerate(vertices)}
+    edges = set()
+    for v in vertices:
+        attrs = style_statement_node(v, edges)
+        G.add_node(ids[v], **attrs)
+    for v1, v2, i in edges:
+        kw = style_edge(i, v1, v2)
+        G.add_edge(ids[v1], ids[v2], **kw)
+
     G.draw(png_path, prog='dot')

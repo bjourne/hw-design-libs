@@ -15,7 +15,6 @@
 
         // Negations
         "not_p" : ["p"],
-        //"not_rstn" : ["rstn"],
 
         // Comparisions and subtraction
         "x_ge_y" : ["x", "y"],

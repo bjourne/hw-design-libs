@@ -11,7 +11,6 @@ class Vertex:
 
         # We don't yet support vertices with multiple outputs.
         self.successors = []
-        self.internalized = {}
 
     def __repr__(self):
         return 'Vertex<%s:%s:%s>' % (self.name, self.type, self.arity or '?')

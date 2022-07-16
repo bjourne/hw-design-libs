@@ -2,43 +2,47 @@
     // Same GCD except now we are squeezing all state into one register.
     "predecessors" : {
         // Slices
-        "sl_p_fr_pxy" : ["pxy", "c16_8", "c16_8"],
-        "sl_x_fr_pxy" : ["pxy", "c15_8", "c8_8"],
-        "sl_y_fr_pxy" : ["pxy", "c7_8", "c0_8"],
+        "p" : ["pxy", "c16_8", "c16_8"],
+        "x" : ["pxy", "c15_8", "c8_8"],
+        "y" : ["pxy", "c7_8", "c0_8"],
 
         // Registers
         "pxy" : ["clk", "next0"],
 
         // Concatenations
-        "cat_rstn" : ["c0_1", "c0_8", "c0_8"],
-        "cat_load" : ["c1_1", "a", "b"],
+        "cat_00" : ["c0_8", "c0_8"],
+        "cat_rstn" : ["c0_1", "cat_00"],
+        "cat_load" : ["c1_1", "cat_ab"],
 
-        "cat_done" : ["c0_1", "sl_y_fr_pxy", "sl_x_fr_pxy"],
-        "cat_x_ge_y" : ["sl_p_fr_pxy", "sl_y_fr_pxy", "sl_x_fr_pxy"],
-        "cat_x_y_sub_x" : ["sl_p_fr_pxy", "sl_x_fr_pxy", "y_sub_x"],
+        "cat_ab" : ["a", "b"],
+        "cat_yx" : ["y", "x"],
+        "cat_x_y_sub_x" : ["x", "y_sub_x"],
+        "cat_done" : ["c0_1", "cat_yx"],
+        "cat_p_x_ge_y" : ["p", "cat_yx"],
+        "cat_p_x_y_sub_x" : ["p", "cat_x_y_sub_x"],
 
         // Negations
-        "not_p" : ["sl_p_fr_pxy"],
+        "not_p" : ["p"],
         "not_rstn" : ["rstn"],
 
         // Comparisions and subtraction
-        "x_ge_y" : ["sl_x_fr_pxy", "sl_y_fr_pxy"],
-        "y_eq_0" : ["sl_y_fr_pxy", "c0_8"],
-        "y_sub_x" : ["sl_y_fr_pxy", "sl_x_fr_pxy"],
+        "x_ge_y" : ["x", "y"],
+        "y_eq_0" : ["y", "c0_8"],
+        "y_sub_x" : ["y", "x"],
 
         // And gates
         "begin_p" : ["in_valid", "not_p"],
-        "y_eq_0_and_p" : ["y_eq_0", "sl_p_fr_pxy"],
+        "y_eq_0_and_p" : ["y_eq_0", "p"],
 
         // Five muxes
         "next0" : ["not_rstn", "cat_rstn", "next1"],
         "next1" : ["begin_p", "cat_load", "next2"],
         "next2" : ["y_eq_0", "cat_done", "next3"],
-        "next3" : ["x_ge_y", "cat_x_ge_y", "cat_x_y_sub_x"],
+        "next3" : ["x_ge_y", "cat_p_x_ge_y", "cat_p_x_y_sub_x"],
 
         // Output variables
         "in_ready" : ["not_p"],
-        "o" : ["sl_x_fr_pxy"],
+        "o" : ["x"],
         "out_valid" : ["y_eq_0_and_p"]
     },
     "arities" : {
@@ -54,14 +58,10 @@
         "c15_8" : 15,
         "c16_8" : 16
     },
-    "aliases" : {
-        "sl_p_fr_pxy" : "p",
-        "sl_x_fr_pxy" : "x",
-        "sl_y_fr_pxy" : "y"
-    },
+    "refer_by_name" : ["x", "y", "p"],
     "types" : {
         "input" : ["clk", "rstn", "a", "b", "in_valid"],
-        "output" : ["in_ready", "out_valid", "o"],
+        "output" : ["o", "in_ready", "out_valid"],
         "const" : ["c0_1", "c0_8", "c1_1", "c7_8", "c8_8", "c15_8", "c16_8"],
 
         // Flip flops
@@ -80,9 +80,17 @@
         "sub" : ["y_sub_x"],
 
         // Concat
-        "cat" : ["cat_load", "cat_rstn", "cat_done", "cat_x_ge_y", "cat_x_y_sub_x"],
+        "cat" : [
+            "cat_00",
+            "cat_ab",
+            "cat_yx",
+            "cat_load", "cat_rstn", "cat_done",
+            "cat_p_x_ge_y",
+            "cat_x_y_sub_x",
+            "cat_p_x_y_sub_x"
+        ],
 
         // Slices
-        "slice" : ["sl_p_fr_pxy", "sl_x_fr_pxy", "sl_y_fr_pxy"]
+        "slice" : ["p", "x", "y"]
     }
 }

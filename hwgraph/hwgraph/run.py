@@ -1,7 +1,7 @@
 # Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
 from collections import defaultdict
 from hwgraph import UNARY_OPS, BINARY_OPS, TYPE_TO_SYMBOL, Vertex
-from hwgraph.plotting import internalize_vertices, plot_vertices
+from hwgraph.plotting import plot_vertices, plot_statements
 from itertools import groupby, product
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, Template
 from json import loads
@@ -47,7 +47,10 @@ def render_rval(v1, parent_tp):
         return '%s ? %s : %s' % r_args
         # return '%s\n        ? %s\n        : %s' % tuple(r_args)
     elif tp == 'cat':
-        return '{%s}' % ', '.join(r_args)
+        s = ', '.join(r_args)
+        if parent_tp != 'cat':
+            s = '{%s}' % s
+        return s
     elif tp == 'slice':
         return '%s[%s:%s]' % r_args
     elif tp in BINARY_OPS:
@@ -306,7 +309,7 @@ def load_circuit(path, types):
             vertex_get(vertices, n).arity = ar
     for n, ps in circuit['predecessors'].items():
         ps = [vertex_get(vertices, p) for p in ps]
-        v = vertices[n]
+        v = vertex_get(vertices, n)
         v.predecessors = ps
         for p in ps:
             p.successors.append(v)
@@ -320,7 +323,8 @@ def load_circuit(path, types):
 
 def check_vertex(v):
     tp, n = v.type, v.name
-    disc = tp.input[len(v.predecessors):]
+    preds = [p.name for p in v.predecessors]
+    disc = tp.input[len(preds):]
     fmt = 'Vertex %s has disconnected inputs: %s'
     if disc:
         raise ValueError(fmt % (n, ', '.join(disc)))
@@ -333,6 +337,11 @@ def check_vertex(v):
     if tp.output and not v.successors:
         raise ValueError(fmt % (n, ', '.join(tp.output)))
 
+    fmt = 'Vertex %s has superfluous inputs: %s'
+    extra = preds[len(tp.input):]
+    if extra:
+        raise ValueError(fmt % (n, ', '.join(extra)))
+
 def check_vertices(vertices):
     for v in vertices:
         check_vertex(v)
@@ -344,9 +353,6 @@ def main():
     types = load_types(types_path)
 
     vertices = load_circuit(circuit_path, types)
-
-
-
     check_vertices(vertices)
 
     infer_arities(vertices)
@@ -366,8 +372,11 @@ def main():
 
     path = OUTPUT / f'{circuit_name}.png'
     plot_vertices(vertices, path, False, False, False)
-    vertices = internalize_vertices(vertices)
-    path = OUTPUT / f'{circuit_name}_simplified.png'
-    plot_vertices(vertices, path, False, False, True)
+
+
+    #vertices = internalize_vertices(vertices)
+    path = OUTPUT / f'{circuit_name}_statements.png'
+    plot_statements(vertices, path)
+    #plot_vertices(vertices, path, False, False, True)
 
 main()
