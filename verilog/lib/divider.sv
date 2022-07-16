@@ -2,57 +2,52 @@
 //
 // This module is an adaptation of
 // https://github.com/projf/projf-explore/blob/main/lib/maths/div_int.sv
-
 module divider #(parameter WIDTH=4) (
-    input wire logic clk,
-    input wire logic start,
-    output     logic busy,
-    output     logic valid,
-    output     logic dbz,
-    input wire logic [WIDTH-1:0] x,
-    input wire logic [WIDTH-1:0] y,
-    output     logic [WIDTH-1:0] q,
-    output     logic [WIDTH-1:0] r
+    input wire clk,
+    input wire nrst,
+    input wire in_valid,
+    output in_ready,
+    output out_valid,
+    input wire [WIDTH-1:0] x,
+    input wire [WIDTH-1:0] y,
+    output [WIDTH-1:0] q,
+    output [WIDTH-1:0] r,
+    output dbz
 );
-    logic [WIDTH - 1:0] y1;
-    logic [$clog2(WIDTH):0] i;
-    logic [WIDTH - 1:0] q1;
-    logic [WIDTH:0] ac;
+    reg [WIDTH - 1:0] y1, q;
+    reg [$clog2(WIDTH):0] i;
+    reg [WIDTH:0] ac;
+    reg [0:0] p;
 
-    always_ff @(posedge clk) begin
-        logic [WIDTH - 1:0] q1_next;
-        logic [WIDTH:0] ac_next;
-        if (start) begin
-            valid <= 0;
-            i <= WIDTH - 1;
-            y1 <= y;
-            ac <= x[WIDTH - 1];
-            q1 <= x << 1;
-            if (y == 0) begin
-                busy <= 0;
-                dbz <= 1;
-            end else begin
-                busy <= 1;
-                dbz <= 0;
-            end
-        end else if (busy) begin
-            if (ac >= y1) begin
-                q1_next = (q1 << 1) | 1'b1;
-                ac_next = ((ac - y1) << 1) | q1[WIDTH - 1];
-            end else begin
-                q1_next = q1 << 1;
-                ac_next = (ac << 1) | q1[WIDTH - 1];
-            end
-            if (i == 0) begin
-                busy <= 0;
-                valid <= 1;
-                q <= q1_next;
-                r <= ac_next[WIDTH:1];
-            end else begin
-                i <= i - 1;
-                q1 <= q1_next;
-                ac <= ac_next;
-            end
-        end
+    wire begin_p = in_valid & in_ready;
+    wire [WIDTH:0] ac_sub_y1 = ac - y1;
+
+    // Outputs
+    wire in_ready = !p;
+    wire out_valid = p & (i == 0);
+    wire [WIDTH-1:0] r = ac[WIDTH:1];
+    wire dbz = begin_p & (y == 0);
+
+    always @(posedge clk) begin
+        // State trans for p
+        if (!nrst)
+            p <= 0;
+        else if (begin_p)
+            p <= y != 0;
+        else if (i == 0)
+            p <= 0;
+        else
+            p <= p;
+
+        // For y1 and i
+        y1 <= begin_p ? y : y1;
+        i <= begin_p ? WIDTH : i - 1;
+
+        if (begin_p)
+            {ac, q} <= {{WIDTH{1'b0}}, x, 1'b0};
+        else if (ac >= y1)
+            {ac, q} <= {ac_sub_y1[WIDTH-1:0], q, 1'b1};
+        else
+            {ac, q} <= {ac, q} << 1;
     end
 endmodule
