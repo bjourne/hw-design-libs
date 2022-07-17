@@ -6,7 +6,7 @@ module {{ mod_name }} ({{ inouts|map(attribute='name')|join(', ')  }});
     {%- endfor %}
     {%- endfor %}
 
-    // Flip-flop assignments
+    // Registers
     {%- for clk, regs in regs_per_clk %}
     {%- for v in regs %}
     reg [{{ v.arity - 1 }}:0] {{ v.name }};
@@ -16,7 +16,7 @@ module {{ mod_name }} ({{ inouts|map(attribute='name')|join(', ')  }});
     always @(posedge {{ clk }}) begin
         {%- for v in regs %}
         {%- set inp = v.predecessors[1] %}
-        {%- if inp.type.refer_by_name %}
+        {%- if inp.type.name == 'if' %}
         {{ v.name }} <= {{ inp.name }};
         {%- else %}
         {{ v.name }} <= {{ render_rval(inp, None) }};
@@ -26,10 +26,10 @@ module {{ mod_name }} ({{ inouts|map(attribute='name')|join(', ')  }});
     {%- endfor %}
 
     // Internal wires
-    {%- for v in explicitly_named %}
+    {%- for v in explicit %}
     {{ render_lval('wire', v) }} = {{ render_rval(v, None) }};
     {%- endfor %}
-    {% for v in implicitly_named %}
+    {% for v in implicit %}
     {{ render_lval('wire', v) }} = {{ render_rval(v, None) }};
     {%- endfor %}
 

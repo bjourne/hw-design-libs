@@ -1,0 +1,22 @@
+[{
+    "name" : "First test",
+    "exec" : [
+        ["set", {"rstn" : 0}],
+        ["tick", 1],
+        ["assert", {"in_ready" : 1}]
+    ]
+}, {
+    "name" : "Test decrementing",
+    "exec" : [
+        ["set", {"rstn" : 0}],
+        ["tick", 1],
+        ["assert", {"in_ready" : 1}],
+        ["set", {"in_valid" : 1, "rstn" : 1}],
+        ["tick", 8],
+        ["assert", {"out_valid" : 0}],
+        ["tick", 1],
+        ["assert", {"out_valid" : 1}],
+        ["tick", 1],
+        ["assert", {"out_valid" : 0}]
+    ]
+}]

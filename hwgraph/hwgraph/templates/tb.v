@@ -25,15 +25,17 @@ module {{ mod_name }}_tb();
         clk = 0;
         {%- endif %}
         cycle = 0;
-        {%- for el in tc.get('exec', []) %}
-        {% for k, v in el.get('set', {}).items() %}
+        {%- for cmd, arg in tc['exec'] %}
+        {%- if cmd == 'set' %}
+        {%- for k, v in arg.items() %}
         {{ k }} = {{ v }};
         {%- endfor %}
-        {%- for k, v in el.get('assert', {}).items() %}
+        {%- elif cmd == 'assert' %}
+        {%- for k, v in arg.items() %}
         assert({{ k }} == {{ v }});
         {%- endfor %}
-        {%- if el.get('tick') %}
-        repeat({{ el['tick'] }}) tick;
+        {%- elif cmd == 'tick' %}
+        repeat({{ arg }}) tick;
         {%- endif %}
         {%- endfor %}
     end endtask

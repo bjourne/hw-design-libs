@@ -1,6 +1,10 @@
 # Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
 from collections import defaultdict
-from hwgraph import UNARY_OPS, BINARY_OPS, TYPE_TO_SYMBOL, Vertex
+from hwgraph import (UNARY_OPS,
+                     BINARY_OPS, BALANCED_BINARY_OPS,
+                     TYPE_TO_SYMBOL,
+                     Vertex,
+                     requires_brackets)
 from hwgraph.plotting import plot_vertices, plot_statements
 from itertools import groupby, product
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, Template
@@ -21,7 +25,7 @@ def render_tmpl_to_file(tmpl_name, file_path, **kwargs):
         of.write(txt + '\n')
 
 DEFAULT_INT_ARITY = 20
-COMPARE_OPS = {'ge', 'eq'}
+COMPARE_OPS = {'ge', 'gt', 'eq'}
 ARITH_OPS = {'and', 'xor', 'or', 'sub', 'add'}
 
 OUTPUT = Path('output')
@@ -29,33 +33,37 @@ OUTPUT = Path('output')
 def render_lval(lval_tp, v):
     return f'{lval_tp} [{v.arity - 1}:0] {v.name}'
 
-def render_rval(v1, parent_tp):
-    def render_rval_pred(v, parent_tp):
-        if v.refer_by_name or v.type.refer_by_name:
-            return v.name
-        return render_rval(v, parent_tp)
+def render_rval(v1, parent):
+    def render_rval_pred(child, parent):
+        if (child.refer_by_name or
+            child.type.name == 'if' or
+            any(v2.type.name == 'slice' and
+                v2.predecessors.index(child) == 0
+                for v2 in child.successors)):
+            return child.name
+        return render_rval(child, parent)
     tp = v1.type.name
     sym = TYPE_TO_SYMBOL.get(tp)
 
-    r_args = [render_rval_pred(v2, tp) for v2 in v1.predecessors]
+    r_args = [render_rval_pred(v2, v1) for v2 in v1.predecessors]
     r_args = tuple(r_args)
     if tp == 'const':
-        if parent_tp == 'cat':
+        if parent.type.name == 'cat':
             return f"{v1.arity}'b{v1.value}"
         return f'{v1.value}'
     elif tp == 'if':
         return '%s ? %s : %s' % r_args
-        # return '%s\n        ? %s\n        : %s' % tuple(r_args)
+        #return '%s\n        ? %s\n        : %s' % r_args
     elif tp == 'cat':
         s = ', '.join(r_args)
-        if parent_tp != 'cat':
+        if requires_brackets(v1, parent):
             s = '{%s}' % s
         return s
     elif tp == 'slice':
         return '%s[%s:%s]' % r_args
     elif tp in BINARY_OPS:
         s = f'{r_args[0]} {sym} {r_args[1]}'
-        if parent_tp in BINARY_OPS:
+        if requires_brackets(v1, parent):
             s = f'({s})'
         return s
     elif tp in UNARY_OPS:
@@ -94,11 +102,18 @@ def render_verilog(vertices, mod_name, path):
     regs = vs_by_type['reg']
     regs_per_clk = groupby_sort(regs, lambda v: v.predecessors[0].name)
 
-    internal = [v for v in vertices
-                if v.type.name not in {'input', 'output', 'reg'}]
-    explicitly_named = [v for v in internal if v.refer_by_name]
-    implicitly_named = [v for v in internal
-                        if v.type.refer_by_name and not v.refer_by_name]
+    # Internal nodes to render are those whose type means they must be
+    # referred to by name, who the user has declared should be
+    # referred to by name, and
+
+    internals = [v for v in vertices
+                 if v.type.name != 'reg' and (v.type.name == 'if' or
+                     v.refer_by_name or
+                     any(v2.type.name == 'slice' and
+                         v2.predecessors.index(v) == 0
+                         for v2 in v.successors))]
+
+    implicit, explicit = partition(lambda v: v.refer_by_name, internals)
 
     # Outputs
     outputs = vs_by_type['output']
@@ -106,8 +121,8 @@ def render_verilog(vertices, mod_name, path):
     kwargs = {
         'inouts' : vs_by_type['input'] + vs_by_type['output'],
         'io_groups' : io_groups,
-        'explicitly_named' :  explicitly_named,
-        'implicitly_named' : implicitly_named,
+        'explicit' :  explicit,
+        'implicit' : implicit,
         'outputs' : outputs,
         'regs_per_clk' : regs_per_clk,
         'mod_name' : mod_name,
@@ -143,8 +158,10 @@ def render_args(vs, quote):
     return ', '.join(args)
 
 def render_verilog_tb(vertices, tests, mod_name, path):
-    ins = [v for v in vertices if v.type.name == 'input']
-    outs = [v for v in vertices if v.type.name == 'output']
+    vs_by_type = dict(groupby_sort(vertices, lambda v: v.type.name))
+
+    ins = vs_by_type['input']
+    outs = vs_by_type['output']
     inouts = ins + outs
 
     keyfun = lambda v: v.arity
@@ -154,12 +171,11 @@ def render_verilog_tb(vertices, tests, mod_name, path):
 
     inouts_no_clk, inouts_clk = partition(lambda v: v.name == 'clk', inouts)
 
+    # Monitoring setup.
     mon_verts = [Vertex('cycle', None, DEFAULT_INT_ARITY, 0)] \
         + list(inouts_no_clk)
-
     disp_fmt = render_fmts(mon_verts, 's')
     disp_args = render_args(mon_verts, True)
-
     mon_fmt = render_fmts(mon_verts, None)
     mon_args = render_args(mon_verts, False)
 
@@ -176,9 +192,21 @@ def render_verilog_tb(vertices, tests, mod_name, path):
     }
     render_tmpl_to_file('tb.v', path / f'{mod_name}_tb.v', **kw)
 
-def infer_arity_fwd(v):
-    if v.arity:
+def assert_arity(v, arity):
+    if arity == 3:
+        assert False
+
+    if v.arity == arity:
         return False
+    elif v.arity is None:
+        v.arity = arity
+        return True
+    print(v, arity)
+    print("%s incompatible with arity %d." % (v, arity))
+    print('Preds/succs: %s' % (v.predecessors, v.successors))
+    assert False
+
+def infer_arity_fwd(v):
     tp = v.type.name
     ps = [p for p in v.predecessors]
     arities = [p.arity for p in ps]
@@ -187,31 +215,17 @@ def infer_arity_fwd(v):
         ps = ps[1:]
     if tp == 'cat':
         if all(arities):
-            v.arity = sum(arities)
-            return True
+            return assert_arity(v, sum(arities))
     elif tp == 'slice':
         hi = int(ps[1].value)
         lo = int(ps[2].value)
-        v.arity = hi - lo + 1
-        return True
+        return assert_arity(v, hi - lo + 1)
     elif tp in {'if', 'reg'} | ARITH_OPS | UNARY_OPS:
         if len(set(arities)) == 1 and arities[0]:
-            v.arity = arities[0]
-            return True
+            return assert_arity(v, arities[0])
     elif tp in COMPARE_OPS:
-        v.arity = 1
-        return True
+        return assert_arity(v, 1)
     return False
-
-def assert_arity(v, arity):
-    if v.arity == arity:
-        return False
-    elif v.arity is None:
-        v.arity = arity
-        return True
-    print("%s incompatible with arity %d." % (v, arity))
-    print('Preds/succs: %s' % (v.predecessors, v.successors))
-    assert False
 
 def infer_arity_bwd(v):
     data_ps = v.predecessors
@@ -221,7 +235,7 @@ def infer_arity_bwd(v):
         data_ps = data_ps[1:]
     if tp in {'output'} | UNARY_OPS:
         return assert_arity(data_ps[0], arity)
-    if tp in BINARY_OPS | {'if', 'slice'}:
+    if tp in BALANCED_BINARY_OPS | {'if', 'slice'}:
         v1, v2 = data_ps
         ar1, ar2 = v1.arity, v2.arity
         changed = False
@@ -287,7 +301,6 @@ def load_types(path):
     d1 = load_json(path)
     types = {}
     for n, d2 in d1.items():
-        print(n)
         types[n] = Type(
             n,
             d2['input'], d2['output'],
@@ -319,7 +332,7 @@ def load_circuit(path, types):
     for n in circuit['refer_by_name']:
         vertices[n].refer_by_name = True
     return sorted(vertices.values(),
-                  key = lambda v: (v.type.name, v.arity, v.name))
+                  key = lambda v: (v.type.name, v.arity or 0, v.name))
 
 def check_vertex(v):
     tp, n = v.type, v.name
@@ -371,7 +384,7 @@ def main():
     render_verilog_tb(vertices, tests, circuit_name, OUTPUT)
 
     path = OUTPUT / f'{circuit_name}.png'
-    plot_vertices(vertices, path, True, True, True)
+    plot_vertices(vertices, path, False, False, True)
 
     path = OUTPUT / f'{circuit_name}_statements.png'
     plot_statements(vertices, path)

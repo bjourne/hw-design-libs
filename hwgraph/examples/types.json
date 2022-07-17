@@ -57,6 +57,11 @@
         ],
         "refer_by_name" : false
     },
+    "shl" : {
+        "input": ["bits", "i"],
+        "output": ["o"],
+        "refer_by_name" : false
+    },
     "and" : {
         "input": ["i1", "i2"],
         "output": ["o"],

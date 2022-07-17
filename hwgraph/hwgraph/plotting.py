@@ -1,6 +1,7 @@
 # Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
 from html import escape
-from hwgraph import UNARY_OPS, BINARY_OPS, TYPE_TO_SYMBOL, Vertex
+from hwgraph import (UNARY_OPS, BINARY_OPS, TYPE_TO_SYMBOL, Vertex,
+                     requires_brackets)
 from pygraphviz import AGraph
 
 TYPE_TO_NAME_COLOR = {
@@ -119,12 +120,13 @@ def plot_vertices(vertices, png_path,
 
 def statement_label(v, parent, root, edges):
     def render_pred(v, parent, edges):
-        if v.refer_by_name:
-            tp = v.type.name
+        tp = v.type.name
+        parent_idx = parent.predecessors.index(v)
+        if v.refer_by_name or tp == 'output':
             col = TYPE_TO_NAME_COLOR.get(tp, TYPE_TO_NAME_COLOR[None])
             return colorize(v.name, col)
-        if v.type.name in {'if', 'reg'}:
-            edges.add((v, root, parent.predecessors.index(v)))
+        elif tp in {'if', 'reg'}:
+            edges.add((v, root, parent_idx))
             return '*'
         return statement_label(v, parent, root, edges)
 
@@ -134,8 +136,9 @@ def statement_label(v, parent, root, edges):
     sym = escape(TYPE_TO_SYMBOL.get(tp, ''))
     parent_tp = parent.type.name if parent else None
     rendered_ps = tuple([render_pred(p, v, edges) for p in ps])
+
     if tp == 'slice':
-        return '[%s:%s]' % (rendered_ps[1], rendered_ps[2])
+        return '%s[%s:%s]' % rendered_ps
     elif tp == 'reg':
         return rendered_ps[1]
     elif tp == 'const':
@@ -148,16 +151,16 @@ def statement_label(v, parent, root, edges):
         return '%s%s' % (sym, rendered_ps[0])
     elif tp in BINARY_OPS:
         s = '%s %s %s' % (rendered_ps[0], sym, rendered_ps[1])
-        if parent_tp in BINARY_OPS:
+        if requires_brackets(v, parent):
             s = f'({s})'
         return s
     elif tp == 'cat':
         s = '%s, %s' % (rendered_ps[0], rendered_ps[1])
-        if parent_tp != 'cat':
+        if requires_brackets(v, parent):
             s = '{%s}' % s
         return s
     elif tp == 'if':
-        return '%s ? %s : %s' % rendered_ps
+        return '%s<br/>? %s<br/>: %s' % rendered_ps
     assert False
 
 def draw_statement_label(v, edges):
@@ -171,10 +174,9 @@ def draw_statement_label(v, edges):
 def plot_statements(vertices, png_path):
     G = setup_graph()
 
-    # Vertices to draw
     vertices = [v for v in vertices
                 if (v.type.name in {'reg', 'if', 'output'} or
-                    v.refer_by_name) and v.name != 'clk']
+                    v.refer_by_name)]
 
     edges = set()
     for v in vertices:

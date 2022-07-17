@@ -1,0 +1,128 @@
+{
+    "predecessors" : {
+        "i_eq_0" : ["i", "c0_4"],
+        "i_eq_0_and_p" : ["i_eq_0", "p"],
+
+        "in_ready" : ["not_p"],
+
+        "not_p" : ["p"],
+
+        // Arith
+        "i_sub_1" : ["i", "c1_8"],
+        "ac_ge_b1" : ["ac", "pad_b1"],
+        "ac_sub_b1_int" : ["ac", "pad_b1"],
+
+        // And gates
+        "begin_p" : ["in_valid", "in_ready"],
+        "out_valid" : ["i_eq_0_and_p"],
+        "next_p" : ["rstn", "next_p2"],
+
+        // Shift lefts
+        "acq_shl" : ["acq", "c1_8"],
+
+        // Cats
+        "cat_a0" : ["a", "c0_1"],
+        "cat_0a0" : ["c0_8", "cat_a0"],
+        "cat_ac_ge_b1" : ["ac_sub_b1", "q"],
+        "cat_ac_ge_b1_2" : ["cat_ac_ge_b1", "c1_1"],
+
+        "pad_b1" : ["c0_1", "b1"],
+
+        // Registers
+        "i" : ["clk", "next_i"],
+        "p" : ["clk", "next_p"],
+        "acq" : ["clk", "next_acq"],
+        "b1" : ["clk", "next_b1"],
+
+        // Muxes
+        "next_i" : ["begin_p", "c8_4", "i_sub_1"],
+        "next_p2" : ["begin_p", "c1_1", "next_p3"],
+        "next_p3" : ["i_eq_0", "c0_1", "p"],
+        "next_b1" : ["begin_p", "b", "b1"],
+
+        "next_acq" : ["begin_p", "cat_0a0", "next_acq2"],
+        "next_acq2" : ["ac_ge_b1", "cat_ac_ge_b1_2", "acq_shl"],
+
+        // Slices
+        "sl_r_fr_acq" : ["acq", "c16_8", "c9_8"],
+        "sl_q_fr_acq" : ["acq", "c7_8", "c0_8"],
+        "ac" : ["acq", "c16_8", "c8_8"],
+        "ac_sub_b1" : ["ac_sub_b1_int", "c7_8", "c0_8"],
+
+        // Outputs
+        "q" : ["sl_q_fr_acq"],
+        "r" : ["sl_r_fr_acq"]
+    },
+    "types": {
+        "input" : [
+            "clk", "rstn",
+            "in_valid",
+            "a", "b"
+        ],
+        "output" : ["in_ready", "out_valid", "r", "q"],
+        "reg" : ["p", "i", "acq", "b1"],
+
+        "eq" : ["i_eq_0"],
+        "and" : ["i_eq_0_and_p", "begin_p", "next_p"],
+        "not" : ["not_p"],
+
+
+
+        // Slices
+        "slice" : [
+            "sl_r_fr_acq", "sl_q_fr_acq",
+            "ac",
+            "ac_sub_b1"
+        ],
+
+        // Shl
+        "shl" : ["acq_shl"],
+
+        // Cats
+        "cat" : [
+            "cat_a0", "cat_0a0", "cat_ac_ge_b1",
+            "cat_ac_ge_b1_2",
+            //"cat_acq_shl",
+            "pad_b1"
+        ],
+
+        // Airth
+        "sub" : ["i_sub_1", "ac_sub_b1_int"],
+        "ge" : ["ac_ge_b1"],
+
+        // Muxes
+        "if" : [
+            "next_i", "next_p2", "next_p3",
+            "next_acq", "next_acq2",
+            "next_b1"
+        ],
+        "const" : [
+            "c0_1", "c1_1",
+            "c0_4", "c8_4",
+            "c0_8", "c1_8", "c7_8", "c8_8", "c9_8",
+            "c16_8"
+        ]
+    },
+    "refer_by_name" : [
+        "ac", "b1", "p", "i", "acq",
+        "begin_p",
+        "ac_sub_b1", "ac_ge_b1"
+    ],
+    "values" : {
+        "c0_1" : 0,
+        "c1_1" : 1,
+        "c0_4" : 0,
+        "c8_4" : 8,
+        "c0_8" : 0,
+        "c1_8" : 1,
+        "c7_8" : 7,
+        "c8_8" : 8,
+        "c9_8" : 9,
+        "c16_8" : 16
+    },
+    "arities": {
+        "1" : ["clk", "rstn", "in_valid", "in_ready", "out_valid"],
+        "4" : ["i", "c0_4"],
+        "8" : ["a", "b", "q", "r"]
+    }
+}
