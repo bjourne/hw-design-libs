@@ -1,0 +1,8 @@
+{
+    "xor" : {
+        "input" : ["i1", "i0"],
+        "output" : ["o"],
+        "notation": "infix",
+        "symbol" : "^"
+    }
+}

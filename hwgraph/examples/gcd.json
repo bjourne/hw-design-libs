@@ -17,7 +17,7 @@
         "not_p" : ["p"],
 
         // Comparisions and subtraction
-        "x_ge_y" : ["x", "y"],
+        "x_gt_y" : ["x", "y"],
         "y_eq_0" : ["y", "c0_8"],
         "y_sub_x" : ["y", "x"],
 
@@ -28,7 +28,7 @@
 
         // Five muxes
         "next" : ["begin_p", "cat_ab", "next3"],
-        "next3" : ["x_ge_y", "cat_yx", "cat_x_y_sub_x"],
+        "next3" : ["x_gt_y", "cat_yx", "cat_x_y_sub_x"],
 
         "p_next2" : ["begin_p", "c1_1", "p_next3"],
         "p_next3" : ["y_eq_0", "c0_1", "p"],
@@ -67,7 +67,7 @@
         "if" : ["p_next2", "p_next3", "next", "next3"],
 
         // Arith
-        "ge" : ["x_ge_y"],
+        "gt" : ["x_gt_y"],
         "eq" : ["y_eq_0"],
         "sub" : ["y_sub_x"],
 

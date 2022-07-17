@@ -48,6 +48,15 @@
         ],
         "refer_by_name" : false
     },
+    "gt" : {
+        "input": ["i1", "i2"],
+        "output": ["o"],
+        "arity_constraints" : [
+            ["equals", "o", 1],
+            ["equals", "i1", "i2"]
+        ],
+        "refer_by_name" : false
+    },
     "ge" : {
         "input": ["i1", "i2"],
         "output": ["o"],

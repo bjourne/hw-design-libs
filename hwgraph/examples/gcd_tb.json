@@ -1,141 +1,97 @@
-[
-    {
-        "name" : "gcd(18, 12)",
-        "exec" : [{
-            "set" : {
-                "rstn" : 0
-            },
-            "tick" : 1
-        }, {
-            "set" : {
-                "rstn" : 1,
-                "in_valid" : 1,
-                "a" : 18,
-                "b" : 12
-            },
-            "tick" : 6
-        }, {
-            "assert" : {
-                "out_valid" : 1,
-                "o" : 6
-            }
+[{
+    "name" : "gcd(18, 12)",
+    "exec" : [
+        ["set", {"rstn" : 0}],
+        ["tick", 1],
+        ["set", {
+            "rstn" : 1,
+            "in_valid" : 1,
+            "a" : 18,
+            "b" : 12
+        }],
+        ["tick", 6],
+        ["assert", {
+            "out_valid" : 1,
+            "o" : 6
         }]
-    },
-    {
-        "name" : "Ready only one tick",
-        "exec" : [{
-            "set" : {
-                "rstn" : 0
-            },
-            "tick" : 1
-        }, {
-                "set" : {
-                    "rstn" : 1,
-                    "in_valid" : 1,
-                    "a" : 5,
-                    "b" : 2
-                },
-            "tick" : 1
-        }, {
-            "set" : {
-                "a" : 22
-            },
-            "tick" : 1
-        }, {
-            "assert" : {
-                "o" : 2,
-                "in_ready" : 0
-            }
+    ]
+}, {
+    "name" : "Ready only one tick",
+    "exec" : [
+        ["set", {"rstn" : 0}],
+        ["tick", 1],
+        ["set", {
+            "rstn" : 1,
+            "in_valid" : 1,
+            "a" : 5,
+            "b" : 2
+        }],
+        ["tick", 1],
+        ["set", {"a" : 22}],
+        ["tick", 1],
+        ["assert", {
+            "o" : 2,
+            "in_ready" : 0
         }]
-    },
-    {
-        "name" : "Propagate a to o",
-        "exec" : [{
-            "set" : {
-                "rstn" : 0
-            },
-            "tick" : 1
-        }, {
-            "set" : {
-                "rstn" : 1,
-                "in_valid" : 1,
-                "a" : 5,
-                "b" : 2
-            },
-            "tick" : 1
-        }, {
-            "assert" : {"o" : 5}
+    ]
+}, {
+    "name" : "Propagate a to o",
+    "exec" : [
+        ["set", {"rstn" : 0}],
+        ["tick", 1],
+        ["set", {
+            "rstn" : 1,
+            "in_valid" : 1,
+            "a" : 5,
+            "b" : 2
+        }],
+        ["tick", 1],
+        ["assert", {"o" : 5}]
+    ]
+}, {
+    "name" : "Ready after reset",
+    "exec" : [
+        ["set", {"rstn" : 0}],
+        ["tick", 1],
+        ["assert", {"in_ready" : 1}]
+    ]
+}, {
+    "name" : "gcd(14, 21) then in_ready",
+    "exec" : [
+        ["set", {"rstn" : 0}],
+        ["tick", 1],
+        ["set", {
+            "rstn" : 1,
+            "in_valid" : 1,
+            "a" : 14,
+            "b" : 21
+        }],
+        ["tick", 5],
+        ["assert", {
+            "out_valid" : 1,
+            "o" : 7
+        }],
+        ["tick", 1],
+        ["assert", {"in_ready" : 1}]
+    ]
+}, {
+    "name" : "gcd(15, 10) then followup",
+    "exec" : [
+        ["set", {"rstn" : 0}],
+        ["tick", 1],
+        ["set", {
+            "rstn" : 1,
+            "in_valid" : 1,
+            "a" : 15,
+            "b" : 10
+        }],
+        ["tick", 6],
+        ["set", {"in_valid" : 0}],
+        ["assert", {"out_valid" : 1}],
+        ["tick", 3],
+        ["assert", {
+            "in_ready" : 1,
+            "o" : 0
         }]
-    },
-    {
-        "name" : "Ready after reset",
-        "exec" : [{
-            "set" : {
-                "rstn" : 0
-            },
-            "tick" : 1
-        }, {
-            "assert" : {
-                "in_ready" : 1
-            }
-        }]
-    },
-    {
-        "name" : "gcd(14, 21) then in_ready",
-        "exec" : [{
-            "set" : {
-                "rstn" : 0
-            },
-            "tick" : 1
-        }, {
-            "set" : {
-                "rstn" : 1,
-                "in_valid" : 1,
-                "a" : 14,
-                "b" : 21
-                },
-            "tick" : 5
-        }, {
-            "set" : {},
-            "assert" : {
-                "out_valid" : 1,
-                "o" : 7
-            },
-            "tick" : 1
-        }, {
-            "assert" : {
-                "in_ready" : 1
-            }
-        }]
-    },
-    {
-        "name" : "gcd(15, 10) then followup",
-        "exec" : [{
-            "set" : {
-                "rstn" : 0
-            },
-            "tick" : 1
-        }, {
-            "set" : {
-                "rstn" : 1,
-                "in_valid" : 1,
-                "a" : 15,
-                "b" : 10
-            },
-            "tick" : 6
-        }, {
-            "set" : {
-                "in_valid" : 0
-            },
-            "assert" : {
-                "out_valid" : 1
-            },
-            "tick" : 3
-        },  {
-            "assert" : {
-                "in_ready" : 1,
-                "o" : 0
-            }
-        }]
-    }
-]
+    ]
+}]

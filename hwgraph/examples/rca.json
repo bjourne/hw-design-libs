@@ -1,0 +1,20 @@
+{
+    "predecessors" : {
+        "fa1" : ["a1", "b1", "fa0.co"],
+        "fa0" : ["a0", "b0", "ci"],
+        "s1" : ["fa1.s"],
+        "s0" : ["fa0.s"],
+        "co" : ["fa1.co"]
+    },
+    "types" : {
+        "input" : ["a1", "a0", "b1", "b0", "ci"],
+        "output" : ["s1", "s0", "co"],
+        "full_adder" : ["fa1", "fa0"]
+    },
+    "arities" : {
+        "1" : ["a1", "a0", "b1", "b0", "ci",
+               "s1", "s0", "co"]
+    },
+    "values" : {},
+    "aliases" : {}
+}
