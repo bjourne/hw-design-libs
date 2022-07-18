@@ -26,7 +26,19 @@
     "slice" : {
         "input" : ["bits", "hi", "lo"],
         "output" : ["o"],
-        "refer_by_name" : false
+        "refer_by_name" : false,
+        "arity_constraints" : [
+            ["ge", "hi", "lo"]
+        ]
+    },
+    "cast" : {
+        "input" : ["n", "i"],
+        "output" : ["o"],
+        "refer_by_name" : false,
+        "arity_constraints" : [
+            ["equals", ["value", "n"], "o"],
+            ["ge", "i", ["value", "n"]]
+        ]
     },
     // Logic
     "not" : {
