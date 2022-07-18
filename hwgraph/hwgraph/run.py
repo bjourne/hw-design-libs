@@ -47,13 +47,13 @@ def render_rval(v1, parent):
     r_args = [render_rval_pred(v2, v1) for v2 in v1.predecessors]
     r_args = tuple(r_args)
     if tp == 'const':
-        if parent.type.name == 'cat':
+        if parent.type.name in {'cat'} | BINARY_OPS:
             return f"{v1.arity}'d{v1.value}"
         return f'{v1.value}'
     elif tp == 'cast':
         return "%s'(%s)" % r_args
     elif tp == 'if':
-        return '%s ? %s : %s' % r_args
+        return '%s\n        ? %s\n        : %s' % r_args
     elif tp == 'cat':
         s = '%s, %s' % r_args
         return package_vertex(v1, parent) % s

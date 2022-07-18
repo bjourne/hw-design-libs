@@ -52,8 +52,6 @@ def package_vertex(parent, child):
     if parent_tp in BINARY_OPS:
         if child_tp in BINARY_OPS:
             return '(%s)'
-        elif child_tp == 'cat':
-            return "%d'(%%s)" % parent.arity
     elif parent_tp == 'cat' and child_tp != 'cat':
         return '{%s}'
     return '%s'
