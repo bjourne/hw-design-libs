@@ -1,7 +1,7 @@
 # Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
 from html import escape
 from hwgraph import (UNARY_OPS, BINARY_OPS, TYPE_TO_SYMBOL, Vertex,
-                     requires_brackets)
+                     package_vertex)
 from pygraphviz import AGraph
 
 # Todo: Define child and parent better.
@@ -36,7 +36,7 @@ def colorize(s, col):
 def draw_label(v, draw_arities, draw_names):
     n = v.name
     tp = v.type.name
-    if tp in {'slice', 'reg', 'if', 'cat'}:
+    if tp in {'cast', 'cat', 'slice', 'reg', 'if'}:
         label = tp
     elif tp == 'const':
         label = f'{v.value}'
@@ -147,6 +147,8 @@ def statement_rval(parent, child, root, edges):
         return '%s[%s:%s]' % rendered_ps
     elif tp == 'reg':
         return rendered_ps[1]
+    elif tp == 'cast':
+        return "%s'(%s)" % rendered_ps
     elif tp == 'const':
         return f'{parent.value}'
     elif tp == 'output':
@@ -157,14 +159,10 @@ def statement_rval(parent, child, root, edges):
         return '%s%s' % (sym, rendered_ps[0])
     elif tp in BINARY_OPS:
         s = '%s %s %s' % (rendered_ps[0], sym, rendered_ps[1])
-        if requires_brackets(parent, child):
-            s = f'({s})'
-        return s
+        return package_vertex(parent, child) % s
     elif tp == 'cat':
         s = '%s, %s' % (rendered_ps[0], rendered_ps[1])
-        if requires_brackets(parent, child):
-            s = '{%s}' % s
-        return s
+        return package_vertex(parent, child) % s
     elif tp == 'if':
         return rendered_ps[0]
     assert False

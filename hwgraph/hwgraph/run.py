@@ -4,14 +4,13 @@ from hwgraph import (UNARY_OPS,
                      BINARY_OPS, BALANCED_BINARY_OPS,
                      TYPE_TO_SYMBOL,
                      Vertex,
-                     requires_brackets)
+                     package_vertex)
 from hwgraph.plotting import plot_vertices, plot_statements
 from itertools import groupby, product
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, Template
 from json import loads
 from more_itertools import partition
 from pathlib import Path
-
 from random import shuffle
 from sys import argv
 
@@ -49,23 +48,20 @@ def render_rval(v1, parent):
     r_args = tuple(r_args)
     if tp == 'const':
         if parent.type.name == 'cat':
-            return f"{v1.arity}'b{v1.value}"
+            return f"{v1.arity}'d{v1.value}"
         return f'{v1.value}'
+    elif tp == 'cast':
+        return "%s'(%s)" % r_args
     elif tp == 'if':
         return '%s ? %s : %s' % r_args
-        #return '%s\n        ? %s\n        : %s' % r_args
     elif tp == 'cat':
-        s = ', '.join(r_args)
-        if requires_brackets(v1, parent):
-            s = '{%s}' % s
-        return s
+        s = '%s, %s' % r_args
+        return package_vertex(v1, parent) % s
     elif tp == 'slice':
         return '%s[%s:%s]' % r_args
     elif tp in BINARY_OPS:
         s = f'{r_args[0]} {sym} {r_args[1]}'
-        if requires_brackets(v1, parent):
-            s = f'({s})'
-        return s
+        return package_vertex(v1, parent) % s
     elif tp in UNARY_OPS:
         return f'{sym}{r_args[0]}'
     elif tp in {'input', 'reg'}:
@@ -102,18 +98,9 @@ def render_verilog(vertices, mod_name, path):
     regs = vs_by_type['reg']
     regs_per_clk = groupby_sort(regs, lambda v: v.predecessors[0].name)
 
-    # Internal nodes to render are those whose type means they must be
-    # referred to by name, who the user has declared should be
-    # referred to by name, and
-
-    internals = [v for v in vertices
-                 if v.type.name != 'reg' and (v.type.name == 'if' or
-                     v.refer_by_name or
-                     any(v2.type.name == 'slice' and
-                         v2.predecessors.index(v) == 0
-                         for v2 in v.successors))]
-
-    implicit, explicit = partition(lambda v: v.refer_by_name, internals)
+    others, regs = partition(lambda v: v.type.name == 'reg', vertices)
+    others, explicit = partition(lambda v: v.refer_by_name, others)
+    others, implicit = partition(lambda v: v.type.name == 'if', others)
 
     # Outputs
     outputs = vs_by_type['output']
@@ -216,6 +203,8 @@ def infer_arity_fwd(v):
     if tp == 'cat':
         if all(arities):
             return assert_arity(v, sum(arities))
+    elif tp == 'cast':
+        return assert_arity(v, ps[0].value)
     elif tp == 'slice':
         hi = int(ps[1].value)
         lo = int(ps[2].value)
@@ -294,7 +283,6 @@ class Type:
         fmt = '%s[(%s -> %s)]'
         args = self.name, ', '.join(self.input), ', '.join(self.output)
         return fmt % args
-
 
 def load_types(path):
     print(f'Loading types from {path}.')

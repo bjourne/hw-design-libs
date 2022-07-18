@@ -1,5 +1,4 @@
 # Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
-
 class Vertex:
     def __init__(self, name, type, arity, value):
         self.name = name
@@ -18,7 +17,6 @@ class Vertex:
 # All ops with two inputs.
 BINARY_OPS = {
     'and', 'xor', 'or',
-    # TODO: Fix this (ge vs gt)
     'ge', 'gt',
     'shl',
     'eq', 'sub', 'add'
@@ -48,17 +46,14 @@ TYPE_TO_SYMBOL = {
     'not' : '!'
 }
 
-# Whether we need delimiters around a rendered node.
-def requires_brackets(child, parent):
-    child_tp = child.type.name
-    parent_tp = parent and parent.type.name
-
-    if child_tp in BINARY_OPS and parent_tp:
-        child_idx = parent.predecessors.index(child)
-        if parent_tp in BINARY_OPS:
-            return True
-        elif parent_tp == 'slice' and child_idx == 0:
-            return True
-    elif child_tp == 'cat' and parent_tp != 'cat':
-        return True
-    return False
+def package_vertex(parent, child):
+    parent_tp = parent.type.name
+    child_tp = child and child.type.name
+    if parent_tp in BINARY_OPS:
+        if child_tp in BINARY_OPS:
+            return '(%s)'
+        elif child_tp == 'cat':
+            return "%d'(%%s)" % parent.arity
+    elif parent_tp == 'cat' and child_tp != 'cat':
+        return '{%s}'
+    return '%s'
