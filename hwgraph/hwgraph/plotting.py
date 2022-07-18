@@ -4,6 +4,11 @@ from hwgraph import (UNARY_OPS, BINARY_OPS, TYPE_TO_SYMBOL, Vertex,
                      requires_brackets)
 from pygraphviz import AGraph
 
+# Todo: Define child and parent better.
+# predecessors => parents
+# successors => children
+# A little weird since children contain their parents.
+
 TYPE_TO_NAME_COLOR = {
     'output' : '#7788aa',
     'input' : '#aa8888',
@@ -118,61 +123,46 @@ def plot_vertices(vertices, png_path,
                 G.add_edge(v1.name, v2.name, **attrs)
     G.draw(png_path, prog='dot')
 
-def statement_render_style(child, parent):
-    # Hare-brained stuff
-    child_tp = child.type.name
+def draw_input(parent, child, root, edges):
     parent_tp = parent.type.name
-    child_idx = parent.predecessors.index(child)
-    if parent_tp == 'if' and child_idx != 0:
-        return 'edge'
-    elif child.refer_by_name or child_tp == 'output':
-        return 'reference'
-    elif child_tp in {'if', 'reg'}:
-        return 'edge'
-    else:
-        return 'inline'
+    child_tp = child.type.name
+    parent_idx = child.predecessors.index(parent)
+    if child_tp in {'reg', 'if'} and parent_idx != 0:
+        edges.add((parent, root, parent_idx))
+        return '*'
+    elif parent.refer_by_name or parent_tp == 'output':
+        col = TYPE_TO_NAME_COLOR.get(parent_tp, TYPE_TO_NAME_COLOR[None])
+        return colorize(parent.name, col)
+    elif parent_tp in {'if', 'reg'}:
+        edges.add((parent, root, parent_idx))
+        return '*'
+    return statement_rval(parent, child, root, edges)
 
-def statement_label(v, parent, root, edges):
-    def render_pred(child, parent):
-        style = statement_render_style(child, parent)
-        child_tp = child.type.name
-        child_idx = parent.predecessors.index(child)
-        if style == 'edge':
-            edges.add((child, root, child_idx))
-            return '*'
-        elif style == 'reference':
-            col = TYPE_TO_NAME_COLOR.get(child_tp, TYPE_TO_NAME_COLOR[None])
-            return colorize(child.name, col)
-        return statement_label(child, parent, root, edges)
-
-
-    name = v.name
-    tp = v.type.name
-    ps = v.predecessors
+def statement_rval(parent, child, root, edges):
+    tp = parent.type.name
     sym = escape(TYPE_TO_SYMBOL.get(tp, ''))
-    parent_tp = parent.type.name if parent else None
-    rendered_ps = tuple([render_pred(p, v) for p in ps])
-
+    rendered_ps = tuple([draw_input(p, parent, root, edges)
+                         for p in parent.predecessors])
     if tp == 'slice':
         return '%s[%s:%s]' % rendered_ps
     elif tp == 'reg':
         return rendered_ps[1]
     elif tp == 'const':
-        return f'{v.value}'
+        return f'{parent.value}'
     elif tp == 'output':
         return rendered_ps[0]
     elif tp == 'input':
-        return colorize(name, TYPE_TO_NAME_COLOR[tp])
+        return colorize(parent.name, TYPE_TO_NAME_COLOR[tp])
     elif tp in UNARY_OPS:
         return '%s%s' % (sym, rendered_ps[0])
     elif tp in BINARY_OPS:
         s = '%s %s %s' % (rendered_ps[0], sym, rendered_ps[1])
-        if requires_brackets(v, parent):
+        if requires_brackets(parent, child):
             s = f'({s})'
         return s
     elif tp == 'cat':
         s = '%s, %s' % (rendered_ps[0], rendered_ps[1])
-        if requires_brackets(v, parent):
+        if requires_brackets(parent, child):
             s = '{%s}' % s
         return s
     elif tp == 'if':
@@ -180,24 +170,32 @@ def statement_label(v, parent, root, edges):
     assert False
 
 def draw_statement_label(v, edges):
-    label = statement_label(v, None, v, edges)
+    label = statement_rval(v, None, v, edges)
     if v.refer_by_name or v.type.name == 'output':
         col = TYPE_TO_NAME_COLOR.get(v.type.name, TYPE_TO_NAME_COLOR[None])
         var = colorize(v.name, col)
         label = f'{var} &larr; {label}'
     return f'<{label}>'
 
+def is_root(v):
+    # Roots are the following:
+    #   1) registers, ifs, and outputs
+    #   2) aliased vertices
+    #   3) vertices whose successors can't "consume" them
+    if v.type.name in {'reg', 'if', 'output'}:
+        return True
+    elif v.refer_by_name:
+        return True
+    for s in v.successors:
+        child_idx = s.predecessors.index(v)
+        if s.type.name in {'if', 'reg'} and child_idx != 0:
+            return True
+    return False
+
+
 def plot_statements(vertices, png_path):
     G = setup_graph()
-
-    # Any reg, if, output vertex, any aliased vertex, and any vertex
-    # that is a clause in an if.
-    roots = [v for v in vertices
-             if (v.type.name in {'reg', 'if', 'output'} or
-                 v.refer_by_name or
-                 any(v2.type.name == 'if' and
-                     v2.predecessors.index(v) != 0
-                     for v2 in v.successors))]
+    roots = [v for v in vertices if is_root(v)]
 
     edges = set()
     for v in roots:
