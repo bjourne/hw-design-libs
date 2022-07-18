@@ -273,11 +273,10 @@ def type_get(types, name):
     return tp
 
 class Type:
-    def __init__(self, name, input, output, refer_by_name):
+    def __init__(self, name, input, output):
         self.name = name
         self.input = input
         self.output = output
-        self.refer_by_name = refer_by_name
 
     def __repr__(self):
         fmt = '%s[(%s -> %s)]'
@@ -291,8 +290,7 @@ def load_types(path):
     for n, d2 in d1.items():
         types[n] = Type(
             n,
-            d2['input'], d2['output'],
-            d2['refer_by_name']
+            d2['input'], d2['output']
         )
     return types
 

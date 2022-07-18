@@ -1,18 +1,15 @@
 {
     "input" : {
         "input" : [],
-        "output" : ["o"],
-        "refer_by_name" : false
+        "output" : ["o"]
     },
     "output" : {
         "input" : ["i"],
-        "output" : [],
-        "refer_by_name" : true
+        "output" : []
     },
     "const" : {
         "input" : [],
-        "output" : ["o"],
-        "refer_by_name" : false
+        "output" : ["o"]
     },
     // Structural
     "cat" : {
@@ -20,13 +17,11 @@
         "output" : ["o"],
         "arity_constraints" : [
             ["equals", ["add", "i1", "i2"], "o"]
-        ],
-        "refer_by_name" : false
+        ]
     },
     "slice" : {
         "input" : ["bits", "hi", "lo"],
         "output" : ["o"],
-        "refer_by_name" : false,
         "arity_constraints" : [
             ["ge", "hi", "lo"]
         ]
@@ -34,7 +29,6 @@
     "cast" : {
         "input" : ["n", "i"],
         "output" : ["o"],
-        "refer_by_name" : false,
         "arity_constraints" : [
             ["equals", ["value", "n"], "o"],
             ["ge", "i", ["value", "n"]]
@@ -46,8 +40,7 @@
         "output" : ["o"],
         "arity_constraints" : [
             ["equals", "i", "o"]
-        ],
-        "refer_by_name" : false
+        ]
     },
 
     // Comparisons
@@ -57,8 +50,7 @@
         "arity_constraints" : [
             ["equals", "o", 1],
             ["equals", "i1", "i2"]
-        ],
-        "refer_by_name" : false
+        ]
     },
     "gt" : {
         "input": ["i1", "i2"],
@@ -66,8 +58,7 @@
         "arity_constraints" : [
             ["equals", "o", 1],
             ["equals", "i1", "i2"]
-        ],
-        "refer_by_name" : false
+        ]
     },
     "ge" : {
         "input": ["i1", "i2"],
@@ -75,13 +66,14 @@
         "arity_constraints" : [
             ["equals", "o", 1],
             ["equals", "i1", "i2"]
-        ],
-        "refer_by_name" : false
+        ]
     },
     "shl" : {
         "input": ["bits", "i"],
         "output": ["o"],
-        "refer_by_name" : false
+        "arity_constraints" : [
+            ["equals", "bits", "o"]
+        ]
     },
     "and" : {
         "input": ["i1", "i2"],
@@ -89,8 +81,7 @@
         "arity_constraints" : [
             ["equals", "i1", "i2"],
             ["equals", "i2", "o"]
-        ],
-        "refer_by_name" : false
+        ]
     },
     "or" : {
         "input": ["i1", "i2"],
@@ -98,8 +89,7 @@
         "arity_constraints" : [
             ["equals", "i1", "i2"],
             ["equals", "i2", "o"]
-        ],
-        "refer_by_name" : false
+        ]
     },
     "sub" : {
         "input": ["i1", "i2"],
@@ -107,8 +97,7 @@
         "arity_constraints" : [
             ["equals", "i1", "i2"],
             ["equals", "i2", "o"]
-        ],
-        "refer_by_name" : false
+        ]
     },
     "if" : {
         "input" : ["c", "i1", "i2"],
@@ -117,8 +106,7 @@
             ["equals", "i1", "i2"],
             ["equals", "i2", "o"],
             ["equals", "c", 1]
-        ],
-        "refer_by_name" : true
+        ]
     },
     "reg" : {
         "input" : ["clk", "i"],
@@ -126,7 +114,6 @@
         "arity_constraints" : [
             ["equals", "clk", 1],
             ["equals", "i", "o"]
-        ],
-        "refer_by_name" : true
+        ]
     }
 }
