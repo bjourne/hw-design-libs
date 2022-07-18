@@ -37,6 +37,7 @@
             "q" : 8,
             "r" : 1
         }],
+        // Not sure I get why the circuit needs a "rest" tick
         ["tick", 1],
         ["set", {
             "in_valid" : 1,
@@ -48,7 +49,26 @@
         ["assert", {
             "out_valid" : 1,
             "q" : 6,
-            "r" : 10
+            "r" : 10,
+            "dbz" : 0
+        }]
+    ]
+}, {
+    "name" : "Divide by zero",
+    "exec" : [
+        ["set", {"rstn" : 0}],
+        ["tick", 1],
+        ["assert", {"in_ready" : 1}],
+        ["set", {
+            "in_valid" : 1,
+            "rstn" : 1,
+            "a" : 0,
+            "b" : 0
+        }],
+        ["tick", 8],
+        ["assert", {
+            "out_valid" : 1,
+            "dbz" : 1
         }]
     ]
 }]
