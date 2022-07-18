@@ -85,7 +85,8 @@ def setup_graph():
         'dpi' : 300,
         'ranksep' : 0.3,
         'fontname' : 'Inconsolata',
-        'bgcolor' : 'transparent'
+        'bgcolor' : 'transparent',
+        'rankdir' : 'TB'
     }
     G.graph_attr.update(graph_attrs)
     node_attrs = {
@@ -118,17 +119,32 @@ def plot_vertices(vertices, png_path,
                 G.add_edge(v1.name, v2.name, **attrs)
     G.draw(png_path, prog='dot')
 
+def statement_render_style(child, parent):
+    # Hare-brained stuff
+    child_tp = child.type.name
+    parent_tp = parent.type.name
+    child_idx = parent.predecessors.index(child)
+    if parent_tp == 'if' and child_idx != 0:
+        return 'edge'
+    elif child.refer_by_name or child_tp == 'output':
+        return 'reference'
+    elif child_tp in {'if', 'reg'}:
+        return 'edge'
+    else:
+        return 'inline'
+
 def statement_label(v, parent, root, edges):
-    def render_pred(v, parent, edges):
-        tp = v.type.name
-        parent_idx = parent.predecessors.index(v)
-        if v.refer_by_name or tp == 'output':
-            col = TYPE_TO_NAME_COLOR.get(tp, TYPE_TO_NAME_COLOR[None])
-            return colorize(v.name, col)
-        elif tp in {'if', 'reg'}:
-            edges.add((v, root, parent_idx))
+    def render_pred(child, parent, edges):
+        style = statement_render_style(child, parent)
+        child_tp = child.type.name
+        child_idx = parent.predecessors.index(child)
+        if style == 'edge':
+            edges.add((child, root, child_idx))
             return '*'
-        return statement_label(v, parent, root, edges)
+        elif style == 'reference':
+            col = TYPE_TO_NAME_COLOR.get(tp, TYPE_TO_NAME_COLOR[None])
+            return colorize(child.name, col)
+        return statement_label(child, parent, root, edges)
 
     name = v.name
     tp = v.type.name
@@ -160,7 +176,7 @@ def statement_label(v, parent, root, edges):
             s = '{%s}' % s
         return s
     elif tp == 'if':
-        return '%s<br/>? %s<br/>: %s' % rendered_ps
+        return rendered_ps[0]
     assert False
 
 def draw_statement_label(v, edges):
@@ -174,12 +190,17 @@ def draw_statement_label(v, edges):
 def plot_statements(vertices, png_path):
     G = setup_graph()
 
-    vertices = [v for v in vertices
-                if (v.type.name in {'reg', 'if', 'output'} or
-                    v.refer_by_name)]
+    # Any reg, if, output vertex, any aliased vertex, and any vertex
+    # that is a clause in an if.
+    roots = [v for v in vertices
+             if (v.type.name in {'reg', 'if', 'output'} or
+                 v.refer_by_name or
+                 any(v2.type.name == 'if' and
+                     v2.predecessors.index(v) != 0
+                     for v2 in v.successors))]
 
     edges = set()
-    for v in vertices:
+    for v in roots:
         label = draw_statement_label(v, edges)
         G.add_node(v.name,
                    label = label,
