@@ -80,6 +80,15 @@
         ],
         "refer_by_name" : false
     },
+    "or" : {
+        "input": ["i1", "i2"],
+        "output": ["o"],
+        "arity_constraints" : [
+            ["equals", "i1", "i2"],
+            ["equals", "i2", "o"]
+        ],
+        "refer_by_name" : false
+    },
     "sub" : {
         "input": ["i1", "i2"],
         "output": ["o"],
