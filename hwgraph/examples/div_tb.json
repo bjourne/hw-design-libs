@@ -12,11 +12,43 @@
         ["tick", 1],
         ["assert", {"in_ready" : 1}],
         ["set", {"in_valid" : 1, "rstn" : 1}],
-        ["tick", 8],
+        ["tick", 7],
         ["assert", {"out_valid" : 0}],
         ["tick", 1],
         ["assert", {"out_valid" : 1}],
         ["tick", 1],
         ["assert", {"out_valid" : 0}]
+    ]
+}, {
+    "name" : "Test dividing",
+    "exec" : [
+        ["set", {"rstn" : 0}],
+        ["tick", 1],
+        ["assert", {"in_ready" : 1}],
+        ["set", {
+            "in_valid" : 1,
+            "rstn" : 1,
+            "a" : 25,
+            "b" : 3
+        }],
+        ["tick", 8],
+        ["assert", {
+            "out_valid" : 1,
+            "q" : 8,
+            "r" : 1
+        }],
+        ["tick", 1],
+        ["set", {
+            "in_valid" : 1,
+            "rstn" : 1,
+            "a" : 100,
+            "b" : 15
+        }],
+        ["tick", 8],
+        ["assert", {
+            "out_valid" : 1,
+            "q" : 6,
+            "r" : 10
+        }]
     ]
 }]
