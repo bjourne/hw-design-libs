@@ -82,11 +82,10 @@ def style_edge(pt, v1, v2):
 def setup_graph():
     G = AGraph(strict = False, directed = True)
     graph_attrs = {
-        'dpi' : 300,
+        'dpi' : 150,
         'ranksep' : 0.3,
         'fontname' : 'Inconsolata',
-        'bgcolor' : 'transparent',
-        'rankdir' : 'TB'
+        'bgcolor' : 'transparent'
     }
     G.graph_attr.update(graph_attrs)
     node_attrs = {
@@ -134,7 +133,7 @@ def statement_render_style(child, parent):
         return 'inline'
 
 def statement_label(v, parent, root, edges):
-    def render_pred(child, parent, edges):
+    def render_pred(child, parent):
         style = statement_render_style(child, parent)
         child_tp = child.type.name
         child_idx = parent.predecessors.index(child)
@@ -142,16 +141,17 @@ def statement_label(v, parent, root, edges):
             edges.add((child, root, child_idx))
             return '*'
         elif style == 'reference':
-            col = TYPE_TO_NAME_COLOR.get(tp, TYPE_TO_NAME_COLOR[None])
+            col = TYPE_TO_NAME_COLOR.get(child_tp, TYPE_TO_NAME_COLOR[None])
             return colorize(child.name, col)
         return statement_label(child, parent, root, edges)
+
 
     name = v.name
     tp = v.type.name
     ps = v.predecessors
     sym = escape(TYPE_TO_SYMBOL.get(tp, ''))
     parent_tp = parent.type.name if parent else None
-    rendered_ps = tuple([render_pred(p, v, edges) for p in ps])
+    rendered_ps = tuple([render_pred(p, v) for p in ps])
 
     if tp == 'slice':
         return '%s[%s:%s]' % rendered_ps
@@ -209,4 +209,13 @@ def plot_statements(vertices, png_path):
         kw = style_edge(i, v1, v2)
         G.add_edge(v1.name, v2.name, **kw)
 
+    # Create invisible between vertices lacking edges.
+    solo_roots = set(roots)
+    for v1, v2, i in edges:
+        solo_roots = solo_roots - {v1, v2}
+
+    solo_roots = sorted(solo_roots,
+                        key = lambda v: v.type.name == 'output')
+    for v1, v2 in zip(solo_roots, solo_roots[1:]):
+        G.add_edge(v1.name, v2.name, style='invis')
     G.draw(png_path, prog='dot')
