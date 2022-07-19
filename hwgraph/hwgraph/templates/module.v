@@ -1,11 +1,11 @@
 module {{ mod_name }} ({{ inouts|map(attribute='name')|join(', ')  }});
-    // Input/output declarations
     {%- for lval_tp, grp in io_groups %}
     {%- for ar, vs in grp %}
     {{ lval_tp }} [{{ ar - 1 }}:0] {{ vs|map(attribute='name')|join(', ') }};
     {%- endfor %}
     {%- endfor %}
 
+    {%- if regs_per_clk %}
     // Registers
     {%- for clk, regs in regs_per_clk %}
     {%- for v in regs %}
@@ -24,7 +24,9 @@ module {{ mod_name }} ({{ inouts|map(attribute='name')|join(', ')  }});
         {%- endfor %}
     end
     {%- endfor %}
+    {%- endif %}
 
+    {%- if explicit or implicit %}
     // Internal wires
     {%- for v in explicit %}
     {{ render_lval('wire', v) }} = {{ render_rval(v, None) }};
@@ -32,6 +34,7 @@ module {{ mod_name }} ({{ inouts|map(attribute='name')|join(', ')  }});
     {% for v in implicit %}
     {{ render_lval('wire', v) }} = {{ render_rval(v, None) }};
     {%- endfor %}
+    {%- endif %}
 
     // Output wires
     {%- for v in outputs %}
