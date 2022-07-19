@@ -19,6 +19,12 @@ TYPE_TO_NAME_COLOR = {
     'slice' : '#7788aa',
     None : '#6ca471'
 }
+IF_EDGE_ARROWHEAD_COLORS = {
+    0 : 'black',
+    1 : '#00aa00',
+    2 : '#aa0000'
+}
+
 TYPE_TO_SHAPE = {
     'input' : 'oval',
     'output' : 'oval',
@@ -34,12 +40,12 @@ TYPE_TO_SIZE = {
     'const' : 0.3,
     None : 0.55
 }
-IF_EDGE_ARROWHEAD_COLORS = {0 : 'black', 1 : '#00aa00', 2 : '#aa0000'}
+
 
 def colorize(s, col):
     return '<font color="%s">%s</font>' % (col, s)
 
-def draw_label(v, draw_arities, draw_names):
+def draw_label(v, draw_names):
     n = v.name
     tp = v.type.name
     tp_col = TYPE_TO_NAME_COLOR.get(tp, TYPE_TO_NAME_COLOR[None])
@@ -56,8 +62,6 @@ def draw_label(v, draw_arities, draw_names):
     if v.refer_by_name and draw_names:
         var = colorize(n, tp_col)
         label = f'{var} &larr; {label}'
-    if draw_arities:
-        label = f'{label}:{v.arity or "?"}'
     return f'<{label}>'
 
 def style_node(v):
@@ -73,7 +77,7 @@ def style_node(v):
             'color' : 'black',
             'fillcolor' : fillcolor}
 
-def style_edge(pt, v1, v2):
+def style_edge(pt, v1, v2, draw_arities):
     color = 'black'
     style = 'solid'
     penwidth = 0.5
@@ -85,11 +89,14 @@ def style_edge(pt, v1, v2):
             style = 'dashed'
     if v1.arity != 1:
         penwidth = 1.0
-    return {
+    style = {
         'color' : color,
         'style' : style,
         'penwidth' : penwidth
-        }
+    }
+    if draw_arities:
+        style['label'] = ' %d' % v1.arity
+    return style
 
 def setup_graph():
     G = AGraph(strict = False, directed = True)
@@ -121,13 +128,13 @@ def plot_vertices(vertices, png_path,
     for v in vertices:
         if v.name != 'clk' or draw_clk:
             G.add_node(v.name,
-                       label = draw_label(v, draw_arities, draw_names),
+                       label = draw_label(v, draw_names),
                        **style_node(v))
 
     for v2 in vertices:
         for i, v1 in enumerate(v2.predecessors):
             if v1 and v1.name != 'clk' or draw_clk:
-                attrs = style_edge(i, v1, v2)
+                attrs = style_edge(i, v1, v2, draw_arities)
                 G.add_edge(v1.name, v2.name, **attrs)
     G.draw(png_path, prog='dot')
 
@@ -223,7 +230,7 @@ def is_expression(v):
     return False
 
 
-def plot_expressions(vertices, png_path):
+def plot_expressions(vertices, png_path, draw_arities):
     G = setup_graph()
     exprs = [v for v in vertices if is_expression(v)]
     edges = set()
@@ -233,7 +240,7 @@ def plot_expressions(vertices, png_path):
                    label = label,
                    **style_node(v))
     for v1, v2, i in edges:
-        kw = style_edge(i, v1, v2)
+        kw = style_edge(i, v1, v2, draw_arities)
         G.add_edge(v1.name, v2.name, **kw)
 
     # Create invisible between vertices lacking edges.

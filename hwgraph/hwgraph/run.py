@@ -196,9 +196,9 @@ def main():
     render_tb(vertices, tests, circuit_name, OUTPUT)
 
     path = OUTPUT / f'{circuit_name}.png'
-    plot_vertices(vertices, path, False, False, True)
+    plot_vertices(vertices, path, False, True, True)
 
     path = OUTPUT / f'{circuit_name}_statements.png'
-    plot_expressions(vertices, path)
+    plot_expressions(vertices, path, True)
 
 main()
