@@ -83,6 +83,14 @@
             ["equals", "i2", "o"]
         ]
     },
+    "xor" : {
+        "input": ["i1", "i2"],
+        "output": ["o"],
+        "arity_constraints" : [
+            ["equals", "i1", "i2"],
+            ["equals", "i2", "o"]
+        ]
+    },
     "or" : {
         "input": ["i1", "i2"],
         "output": ["o"],
