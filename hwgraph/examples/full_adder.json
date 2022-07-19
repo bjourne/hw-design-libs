@@ -21,6 +21,6 @@
     "arities" : {
         "1" : ["a", "b", "s", "ci", "co"]
     },
-    "values" : {},
-    "aliases" : {}
+    "refer_by_name" : [],
+    "values" : {}
 }

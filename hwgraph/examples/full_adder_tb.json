@@ -1,39 +1,34 @@
 [{
     "name" : "first test",
-    "exec" : [{
-        "set" : {
+    "exec" : [
+        ["set", {
             "a" : 0,
             "b" : 1,
             "ci" : 0
-        },
-        "tick" : 1
-    }, {
-        "assert" : {
+        }],
+        ["tick", 1],
+        ["assert", {
             "s" : 1
-        }
-    }, {
-        "set" : {
+        }],
+        ["set", {
             "a" : 1,
             "b" : 1,
             "ci" : 1
-        },
-        "tick" : 1
-    }, {
-        "assert" : {
+        }],
+        ["tick", 1],
+        ["assert", {
             "s" : 1,
             "co" : 1
-        }
-    }, {
-        "set" : {
+        }],
+        ["set", {
             "a" : 0,
             "b" : 0,
             "ci" : 0
-        },
-        "tick" : 1
-    }, {
-        "assert" : {
+        }],
+        ["tick", 1],
+        ["assert", {
             "s" : 0,
             "co" : 0
-        }
-    }]
+        }]
+    ]
 }]
