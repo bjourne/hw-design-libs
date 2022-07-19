@@ -5,7 +5,7 @@ from hwgraph import (UNARY_OPS,
                      TYPE_TO_SYMBOL,
                      Vertex,
                      package_vertex)
-from hwgraph.plotting import plot_vertices, plot_statements
+from hwgraph.plotting import plot_vertices, plot_expressions
 from itertools import groupby, product
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, Template
 from json import loads
@@ -32,6 +32,15 @@ OUTPUT = Path('output')
 def render_lval(lval_tp, v):
     return f'{lval_tp} [{v.arity - 1}:0] {v.name}'
 
+def render_rval_const(parent, child):
+    # Putting arity declarations on every constant is ugly so we only
+    # do it when it is (probably) necessary.
+    if (child.type.name in BINARY_OPS and
+        any(s.type.name == 'cat' for s in child.successors) or
+        child.type.name == 'cat'):
+        return "%s'd%s" % (parent.arity, parent.value)
+    return str(parent.value)
+
 def render_rval(v1, parent):
     def render_rval_pred(child, parent):
         if (child.refer_by_name or
@@ -47,13 +56,14 @@ def render_rval(v1, parent):
     r_args = [render_rval_pred(v2, v1) for v2 in v1.predecessors]
     r_args = tuple(r_args)
     if tp == 'const':
-        if parent.type.name in {'cat'} | BINARY_OPS:
-            return f"{v1.arity}'d{v1.value}"
-        return f'{v1.value}'
+        return render_rval_const(v1, parent)
     elif tp == 'cast':
         return "%s'(%s)" % r_args
     elif tp == 'if':
-        return '%s\n        ? %s\n        : %s' % r_args
+        fmt = '%s ? %s : %s'
+        if max(len(a) for a in r_args) > 14:
+            fmt = '%s\n        ? %s\n        : %s'
+        return fmt % r_args
     elif tp == 'cat':
         s = '%s, %s' % r_args
         return package_vertex(v1, parent) % s
@@ -180,9 +190,6 @@ def render_verilog_tb(vertices, tests, mod_name, path):
     render_tmpl_to_file('tb.v', path / f'{mod_name}_tb.v', **kw)
 
 def assert_arity(v, arity):
-    if arity == 3:
-        assert False
-
     if v.arity == arity:
         return False
     elif v.arity is None:
@@ -222,6 +229,7 @@ def infer_arity_bwd(v):
     arity = v.arity
     if tp in {'if', 'reg', 'slice'}:
         data_ps = data_ps[1:]
+
     if tp in {'output'} | UNARY_OPS:
         return assert_arity(data_ps[0], arity)
     if tp in BALANCED_BINARY_OPS | {'if', 'slice'}:
@@ -373,6 +381,6 @@ def main():
     plot_vertices(vertices, path, False, False, True)
 
     path = OUTPUT / f'{circuit_name}_statements.png'
-    plot_statements(vertices, path)
+    plot_expressions(vertices, path)
 
 main()

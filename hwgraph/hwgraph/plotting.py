@@ -11,13 +11,19 @@ from pygraphviz import AGraph
 
 TYPE_TO_NAME_COLOR = {
     'output' : '#7788aa',
-    'input' : '#aa8888',
+    'input' : '#cc8877',
+
+    # Slices and registers have the same color since they usually
+    # refer to the same data.
+    'reg' : '#bb77bb',
+    'slice' : '#bb77bb',
     None : '#6ca471'
 }
 TYPE_TO_SHAPE = {
     'input' : 'oval',
     'output' : 'oval',
     'if' : 'diamond',
+    'reg' : 'record',
     None : 'box'
 }
 TYPE_TO_FILLCOLOR = {
@@ -36,18 +42,19 @@ def colorize(s, col):
 def draw_label(v, draw_arities, draw_names):
     n = v.name
     tp = v.type.name
+    tp_col = TYPE_TO_NAME_COLOR.get(tp, TYPE_TO_NAME_COLOR[None])
     if tp in {'cast', 'cat', 'slice', 'reg', 'if'}:
         label = tp
     elif tp == 'const':
         label = f'{v.value}'
     elif tp in {'input', 'output'}:
-        label = colorize(n, TYPE_TO_NAME_COLOR[tp])
+        label = colorize(n, tp_col)
     elif tp in UNARY_OPS | BINARY_OPS:
         label = escape(TYPE_TO_SYMBOL.get(tp, ''))
     else:
         assert False
     if v.refer_by_name and draw_names:
-        var = colorize(n, TYPE_TO_NAME_COLOR[None])
+        var = colorize(n, tp_col)
         label = f'{var} &larr; {label}'
     if draw_arities:
         label = f'{label}:{v.arity or "?"}'
@@ -123,64 +130,87 @@ def plot_vertices(vertices, png_path,
                 G.add_edge(v1.name, v2.name, **attrs)
     G.draw(png_path, prog='dot')
 
-def draw_input(parent, child, root, edges):
+def expression_label_reg(v):
+    col = TYPE_TO_NAME_COLOR['reg']
+    fmt = '%s &larr; [%d:%d]'
+
+    top = None
+    if v.refer_by_name:
+        top = fmt % (colorize(v.name, col), v.arity - 1, 0)
+
+    slices = [(v2.predecessors[1].value, v2.predecessors[2].value, v2.name)
+              for v2 in v.successors if (v2.type.name == 'slice' and
+                                         v2.refer_by_name)]
+    slices = reversed(sorted(slices))
+    slices = [fmt % (colorize(n, col), hi, lo) for hi, lo, n in slices]
+    slices = '|'.join(slices)
+    if top:
+        return '{ %s |{%s}}' % (top, slices) if slices else top
+    return slices
+
+def expression_input(parent, child, v_expr, edges):
     parent_tp = parent.type.name
     child_tp = child.type.name
     parent_idx = child.predecessors.index(parent)
     if child_tp in {'reg', 'if'} and parent_idx != 0:
-        edges.add((parent, root, parent_idx))
-        return '*'
+        edges.add((parent, v_expr, parent_idx))
+        return None
     elif parent.refer_by_name or parent_tp == 'output':
         col = TYPE_TO_NAME_COLOR.get(parent_tp, TYPE_TO_NAME_COLOR[None])
         return colorize(parent.name, col)
     elif parent_tp in {'if', 'reg'}:
-        edges.add((parent, root, parent_idx))
+        edges.add((parent, v_expr, parent_idx))
         return '*'
-    return statement_rval(parent, child, root, edges)
+    return expression_label_rec(parent, child, v_expr, edges)
 
-def statement_rval(parent, child, root, edges):
+def expression_label_rec(parent, child, v_expr, edges):
     tp = parent.type.name
     sym = escape(TYPE_TO_SYMBOL.get(tp, ''))
-    rendered_ps = tuple([draw_input(p, parent, root, edges)
-                         for p in parent.predecessors])
+    r_args = tuple([expression_input(p, parent, v_expr, edges)
+                    for p in parent.predecessors])
     if tp == 'slice':
-        return '%s[%s:%s]' % rendered_ps
+        return '%s[%s:%s]' % r_args
     elif tp == 'reg':
-        return rendered_ps[1]
+        return expression_label_reg(parent)
     elif tp == 'cast':
-        return "%s'(%s)" % rendered_ps
+        return "%s'(%s)" % r_args
     elif tp == 'const':
-        return f'{parent.value}'
+        val = parent.value
+        return str(val)
     elif tp == 'output':
-        return rendered_ps[0]
+        return r_args[0]
     elif tp == 'input':
         return colorize(parent.name, TYPE_TO_NAME_COLOR[tp])
     elif tp in UNARY_OPS:
-        return '%s%s' % (sym, rendered_ps[0])
+        return '%s%s' % (sym, r_args[0])
     elif tp in BINARY_OPS:
-        s = '%s %s %s' % (rendered_ps[0], sym, rendered_ps[1])
+        s = '%s %s %s' % (r_args[0], sym, r_args[1])
         return package_vertex(parent, child) % s
     elif tp == 'cat':
-        s = '%s, %s' % (rendered_ps[0], rendered_ps[1])
+        s = '%s, %s' % (r_args[0], r_args[1])
         return package_vertex(parent, child) % s
     elif tp == 'if':
-        return rendered_ps[0]
+        return r_args[0]
     assert False
 
-def draw_statement_label(v, edges):
-    label = statement_rval(v, None, v, edges)
-    if v.refer_by_name or v.type.name == 'output':
-        col = TYPE_TO_NAME_COLOR.get(v.type.name, TYPE_TO_NAME_COLOR[None])
+def expression_label(v, edges):
+    label = expression_label_rec(v, None, v, edges)
+    tp = v.type.name
+    if tp != 'reg' and (v.refer_by_name or tp == 'output'):
+        col = TYPE_TO_NAME_COLOR.get(tp, TYPE_TO_NAME_COLOR[None])
         var = colorize(v.name, col)
         label = f'{var} &larr; {label}'
     return f'<{label}>'
 
-def is_root(v):
-    # Roots are the following:
+def is_expression(v):
+    # Expressions are the following:
     #   1) registers, ifs, and outputs
-    #   2) aliased vertices
+    #   2) aliased vertices, unless they are slices
     #   3) vertices whose successors can't "consume" them
-    if v.type.name in {'reg', 'if', 'output'}:
+    tp = v.type.name
+    if tp == 'slice':
+        return False
+    elif tp in {'reg', 'if', 'output'}:
         return True
     elif v.refer_by_name:
         return True
@@ -191,13 +221,12 @@ def is_root(v):
     return False
 
 
-def plot_statements(vertices, png_path):
+def plot_expressions(vertices, png_path):
     G = setup_graph()
-    roots = [v for v in vertices if is_root(v)]
-
+    exprs = [v for v in vertices if is_expression(v)]
     edges = set()
-    for v in roots:
-        label = draw_statement_label(v, edges)
+    for v in exprs:
+        label = expression_label(v, edges)
         G.add_node(v.name,
                    label = label,
                    **style_node(v))
@@ -206,12 +235,12 @@ def plot_statements(vertices, png_path):
         G.add_edge(v1.name, v2.name, **kw)
 
     # Create invisible between vertices lacking edges.
-    solo_roots = set(roots)
+    trivial_exprs = set(exprs)
     for v1, v2, i in edges:
-        solo_roots = solo_roots - {v1, v2}
+        trivial_exprs -= {v1, v2}
 
-    solo_roots = sorted(solo_roots,
-                        key = lambda v: v.type.name == 'output')
-    for v1, v2 in zip(solo_roots, solo_roots[1:]):
+    trivial_exprs = sorted(trivial_exprs,
+                           key = lambda v: v.type.name == 'output')
+    for v1, v2 in zip(trivial_exprs, trivial_exprs[1:]):
         G.add_edge(v1.name, v2.name, style='invis')
     G.draw(png_path, prog='dot')
