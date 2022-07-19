@@ -1,4 +1,15 @@
 # Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
+class Type:
+    def __init__(self, name, input, output):
+        self.name = name
+        self.input = input
+        self.output = output
+
+    def __repr__(self):
+        fmt = '%s[(%s -> %s)]'
+        args = self.name, ', '.join(self.input), ', '.join(self.output)
+        return fmt % args
+
 class Vertex:
     def __init__(self, name, type, arity, value):
         self.name = name
@@ -32,6 +43,8 @@ BALANCED_BINARY_OPS = {
     'ge', 'gt',
     'eq', 'sub', 'add'
 }
+
+DEFAULT_INT_ARITY = 20
 
 TYPE_TO_SYMBOL = {
     'and' : '&',

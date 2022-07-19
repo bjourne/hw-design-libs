@@ -10,13 +10,13 @@ from pygraphviz import AGraph
 # A little weird since children contain their parents.
 
 TYPE_TO_NAME_COLOR = {
-    'output' : '#7788aa',
+    'output' : '#bb77bb',
     'input' : '#cc8877',
 
     # Slices and registers have the same color since they usually
     # refer to the same data.
-    'reg' : '#bb77bb',
-    'slice' : '#bb77bb',
+    'reg' : '#7788aa',
+    'slice' : '#7788aa',
     None : '#6ca471'
 }
 TYPE_TO_SHAPE = {
@@ -170,7 +170,8 @@ def expression_label_rec(parent, child, v_expr, edges):
     r_args = tuple([expression_input(p, parent, v_expr, edges)
                     for p in parent.predecessors])
     if tp == 'slice':
-        return '%s[%s:%s]' % r_args
+        return '[%s:%s]' % r_args[1:]
+        #return '%s[%s:%s]' % r_args
     elif tp == 'reg':
         return expression_label_reg(parent)
     elif tp == 'cast':
