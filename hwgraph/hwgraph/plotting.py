@@ -97,7 +97,8 @@ def setup_graph():
         'dpi' : 150,
         'ranksep' : 0.3,
         'fontname' : 'Inconsolata',
-        'bgcolor' : 'transparent'
+        'bgcolor' : 'transparent',
+        'rankdir' : 'TB'
     }
     G.graph_attr.update(graph_attrs)
     node_attrs = {

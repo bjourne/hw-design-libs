@@ -105,7 +105,7 @@ def render_verilog(vertices, mod_name, path):
     io_groups = [('input', gr_ins), ('output', gr_outs)]
 
     # Group registers by driving clock.
-    regs = vs_by_type['reg']
+    regs = vs_by_type.get('reg', [])
     regs_per_clk = groupby_sort(regs, lambda v: v.predecessors[0].name)
 
     others, regs = partition(lambda v: v.type.name == 'reg', vertices)
@@ -118,8 +118,8 @@ def render_verilog(vertices, mod_name, path):
     kwargs = {
         'inouts' : vs_by_type['input'] + vs_by_type['output'],
         'io_groups' : io_groups,
-        'explicit' :  explicit,
-        'implicit' : implicit,
+        'explicit' :  list(explicit),
+        'implicit' : list(implicit),
         'outputs' : outputs,
         'regs_per_clk' : regs_per_clk,
         'mod_name' : mod_name,
