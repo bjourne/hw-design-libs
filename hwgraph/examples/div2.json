@@ -1,0 +1,145 @@
+// Same as the previous divider, but here I'm trying to join i with b1.
+{
+    "predecessors" : {
+        "i_eq_0" : ["i", "c0_4"],
+        "i_eq_0_and_p" : ["i_eq_0", "p"],
+
+        "in_ready" : ["not_p"],
+
+        "not_p" : ["p"],
+
+        // Arith
+        "i_sub_1" : ["i", "c1_8"],
+        "ac_ge_b1" : ["ac", "pad_b1"],
+        "ac_sub_b1_int" : ["ac", "pad_b1"],
+        "b1_eq_0" : ["b1", "c0_8"],
+
+        // And gates
+        "begin_p" : ["in_valid", "in_ready"],
+        "out_valid" : ["i_eq_0_and_p"],
+        "next_p" : ["rstn", "next_p2"],
+
+        // Shift lefts
+        "acq_shl" : ["cat_acq", "c1_8"],
+
+        // Cats
+        "cat_a0" : ["a", "c0_1"],
+        "cat_0a0" : ["c0_8", "cat_a0"],
+        "cat_ac_ge_b1" : ["ac_sub_b1", "q1"],
+        "cat_ac_ge_b1_2" : ["cat_ac_ge_b1", "c1_1"],
+        "cat_acq" : ["ac", "q1"],
+        "cat_7_b" : ["c7_4", "b"],
+        "cat_i_sub_1_b1" : ["i_sub_1", "b1"],
+
+        "pad_b1" : ["c0_1", "b1"],
+
+        // Registers
+        "p" : ["clk", "next_p"],
+        "acq" : ["clk", "next_acq"],
+        "i_b1" : ["clk", "next_i_b1"],
+
+        // Muxes
+        "next_p2" : ["begin_p", "c1_1", "next_p3"],
+        "next_p3" : ["i_eq_0", "c0_1", "p"],
+
+        "next_i_b1" : ["begin_p", "cat_7_b", "cat_i_sub_1_b1"],
+
+        "next_acq" : ["begin_p", "cat_0a0", "next_acq2"],
+        "next_acq2" : ["ac_ge_b1", "cat_ac_ge_b1_2", "acq_shl"],
+
+        // Slices
+        "sl_r_fr_next_acq" : ["next_acq", "c16_8", "c9_8"],
+        "sl_q_fr_next_acq" : ["next_acq", "c7_8", "c0_8"],
+        "q1" : ["acq", "c7_8", "c0_8"],
+        "ac" : ["acq", "c16_8", "c8_8"],
+        "i" : ["i_b1", "c11_8", "c8_8"],
+        "b1" : ["i_b1", "c7_8", "c0_8"],
+
+        // Casts
+        "ac_sub_b1" : ["c8_8", "ac_sub_b1_int"],
+
+        // Outputs
+        "q" : ["sl_q_fr_next_acq"],
+        "r" : ["sl_r_fr_next_acq"],
+        "dbz" : ["b1_eq_0"]
+    },
+    "types": {
+        "input" : [
+            "clk", "rstn",
+            "in_valid",
+            "a", "b"
+        ],
+        "output" : [
+            "in_ready", "out_valid", "r", "q", "dbz"
+        ],
+        "reg" : ["p", "acq", "i_b1"],
+
+        // Arith and logic.
+        "sub" : ["i_sub_1", "ac_sub_b1_int"],
+        "ge" : ["ac_ge_b1"],
+        "eq" : ["i_eq_0", "b1_eq_0"],
+        "and" : ["i_eq_0_and_p", "begin_p", "next_p"],
+        "not" : ["not_p"],
+        "shl" : ["acq_shl"],
+
+        // Slices
+        "slice" : [
+            "sl_r_fr_next_acq", "q1",
+            "sl_q_fr_next_acq",
+            "ac",
+            "i", "b1"
+        ],
+
+        // Casts
+        "cast" : ["ac_sub_b1"],
+
+
+        // Cats
+        "cat" : [
+            "cat_a0", "cat_0a0", "cat_ac_ge_b1",
+            "cat_ac_ge_b1_2",
+            "cat_acq",
+            "pad_b1",
+            "cat_7_b",
+            "cat_i_sub_1_b1"
+        ],
+
+        // Muxes
+        "if" : [
+            "next_p2",
+            "next_p3",
+            "next_acq",
+            "next_acq2",
+            "next_i_b1"
+        ],
+        "const" : [
+            "c0_1", "c1_1",
+            "c0_4", "c7_4",
+            "c0_8", "c1_8", "c7_8", "c8_8", "c9_8",
+            "c11_8",
+            "c16_8"
+        ]
+    },
+    "refer_by_name" : [
+        "ac", "b1", "p", "i", "q1",
+        "begin_p"
+    ],
+    "values" : {
+        "c0_1" : 0,
+        "c1_1" : 1,
+        "c0_4" : 0,
+        "c7_4" : 7,
+        "c0_8" : 0,
+        "c1_8" : 1,
+        "c7_8" : 7,
+        "c8_8" : 8,
+        "c9_8" : 9,
+        "c11_8": 11,
+        "c16_8" : 16
+    },
+    "arities": {
+        "1" : ["clk", "rstn", "in_valid", "in_ready", "out_valid", "dbz"],
+        "4" : ["i", "c0_4"],
+        "8" : ["a", "b", "q", "r"]
+    }
+}
