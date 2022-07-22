@@ -16,7 +16,7 @@ module gcd #(parameter WIDTH=16) (
 
     wire [0:0] begin_p = in_valid & not_p;
 
-    wire [0:0] p_next3 = out_valid ? 0 : p;
+    wire [0:0] p_next3 = y_eq_0 ? 0 : p;
     wire [0:0] p_next2 = begin_p ? 1 : p_next3;
     wire [0:0] p_next = not_rstn ? 0 : p_next2;
 

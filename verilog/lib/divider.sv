@@ -14,22 +14,24 @@ module divider #(parameter WIDTH=4) (
     output [WIDTH-1:0] r,
     output dbz
 );
-    reg [WIDTH - 1:0] y1, q;
+    reg [2*WIDTH:0] acq;
+    reg [WIDTH - 1:0] y1;
     reg [$clog2(WIDTH):0] i;
-    reg [WIDTH:0] ac;
     reg [0:0] p;
 
     wire begin_p = in_valid & in_ready;
-    wire [WIDTH:0] ac_sub_y1 = ac - y1;
+    wire [WIDTH:0] ac_sub_y1 = acq[2*WIDTH:WIDTH] - y1;
 
     // Outputs
     wire in_ready = !p;
     wire out_valid = p & (i == 0);
-    wire [WIDTH-1:0] r = ac[WIDTH:1];
     wire dbz = begin_p & (y == 0);
 
+    // This is wrong because it is delayed one cycle.
+    wire [WIDTH-1:0] r = acq[2*WIDTH:WIDTH+1];
+    wire [WIDTH-1:0] q = acq[WIDTH-1:0];
+
     always @(posedge clk) begin
-        // State trans for p
         if (!nrst)
             p <= 0;
         else if (begin_p)
@@ -43,11 +45,13 @@ module divider #(parameter WIDTH=4) (
         y1 <= begin_p ? y : y1;
         i <= begin_p ? WIDTH : i - 1;
 
-        if (begin_p)
-            {ac, q} <= {{WIDTH{1'b0}}, x, 1'b0};
-        else if (ac >= y1)
-            {ac, q} <= {ac_sub_y1[WIDTH-1:0], q, 1'b1};
-        else
-            {ac, q} <= {ac, q} << 1;
+        if (begin_p) begin
+            acq <= {{WIDTH{1'b0}}, x, 1'b0};
+        end else if (acq[2*WIDTH:WIDTH] >= y1)
+            acq <= {ac_sub_y1[WIDTH-1:0], acq[WIDTH-1:0], 1'b1};
+        else begin
+            // This could be a left shift
+            acq <= acq << 1;
+        end
     end
 endmodule
