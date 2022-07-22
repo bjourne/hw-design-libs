@@ -11,6 +11,11 @@
         "input" : [],
         "output" : ["o"]
     },
+    // Temporarily here
+    "full_adder" : {
+        "input" : ["a", "b", "ci"],
+        "output" : ["s", "co"]
+    },
     // Structural
     "cat" : {
         "input" : ["i1", "i2"],
@@ -23,7 +28,8 @@
         "input" : ["bits", "hi", "lo"],
         "output" : ["o"],
         "arity_constraints" : [
-            ["ge", "hi", "lo"]
+            ["ge", "hi", "lo"],
+            ["equals", ["add", ["sub", "hi", "lo"], 1], "o"]
         ]
     },
     "cast" : {
