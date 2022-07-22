@@ -12,8 +12,6 @@ from pathlib import Path
 from random import shuffle
 from sys import argv
 
-COMPARE_OPS = {'ge', 'gt', 'eq'}
-ARITH_OPS = {'and', 'xor', 'or', 'sub', 'add'}
 OUTPUT = Path('output')
 
 def load_json(fname):
@@ -33,29 +31,6 @@ def assert_arity(v, arity):
     print("%s incompatible with arity %d." % (v, arity))
     print('Preds/succs: %s' % (v.predecessors, v.successors))
     assert False
-
-def infer_arity_fwd(v):
-    tp = v.type.name
-    ps = [p for p in v.predecessors]
-    arities = [p.arity for p in ps]
-    if tp in {'if', 'reg'}:
-        arities = arities[1:]
-        ps = ps[1:]
-    if tp == 'cat':
-        if all(arities):
-            return assert_arity(v, sum(arities))
-    elif tp == 'cast':
-        return assert_arity(v, ps[0].value)
-    elif tp == 'slice':
-        hi = int(ps[1].value)
-        lo = int(ps[2].value)
-        return assert_arity(v, hi - lo + 1)
-    elif tp in {'if', 'reg'} | ARITH_OPS | UNARY_OPS:
-        if len(set(arities)) == 1 and arities[0]:
-            return assert_arity(v, arities[0])
-    elif tp in COMPARE_OPS:
-        return assert_arity(v, 1)
-    return False
 
 def infer_arity_bwd(v):
     data_ps = v.predecessors
@@ -114,6 +89,17 @@ def type_get(types, name):
         raise ValueError(f'Missing type: {name}')
     return tp
 
+def port_get(types, vertices, port):
+    if '.' in port:
+        name, out = port.split('.')
+    else:
+        name, out = port, 'o'
+    v = vertex_get(vertices, name)
+    tp = v.type
+    if out not in tp.output:
+        raise ValueError(f'No {out} output for {tp.name}')
+    return v, out
+
 def load_types(path):
     print(f'Loading types from {path}.')
     d1 = load_json(path)
@@ -132,29 +118,33 @@ def load_circuit(path, types):
     for tp_name, ns in circuit['types'].items():
         tp = type_get(types, tp_name)
         for n in ns:
-            vertices[n] = Vertex(n, tp, None, None)
+            vertices[n] = Vertex(n, tp)
     for ar, ns in circuit['arities'].items():
         ar = int(ar)
         for n in ns:
             vertex_get(vertices, n).arity = ar
-    for n, ps in circuit['predecessors'].items():
-        ps = [vertex_get(vertices, p) for p in ps]
-        v = vertex_get(vertices, n)
-        v.predecessors = ps
-        for p in ps:
-            p.successors.append(v)
+
+    for v_to, ports in circuit['inputs'].items():
+        v_to = vertex_get(vertices, v_to)
+        for port in ports:
+            v_from, out = port_get(types, vertices, port)
+            connect_vertices(v_from, out, v_to)
+            # v_to.input.append((v_from, out))
+            # v_from.output[out].wires.append(v_to)
+
     for n, v in circuit.get('values', {}).items():
         vertices[n].value = v
 
     for n in circuit['refer_by_name']:
         vertices[n].refer_by_name = True
-    return sorted(vertices.values(),
-                  key = lambda v: (v.type.name, v.arity or 0, v.name))
+    return vertices.values()
+    # return sorted(vertices.values(),
+    #               key = lambda v: (v.type.name, v.arity or 0, v.name))
 
 def check_vertex(v):
     tp, n = v.type, v.name
-    preds = [p.name for p in v.predecessors]
-    disc = tp.input[len(preds):]
+    inputs = [i.name for i in v.inputs]
+    disc = tp.input[len(inputs):]
     fmt = 'Vertex %s has disconnected inputs: %s'
     if disc:
         raise ValueError(fmt % (n, ', '.join(disc)))
@@ -164,17 +154,14 @@ def check_vertex(v):
         raise ValueError(fmt % n)
 
     fmt = 'Vertex %s has disconnected outputs: %s'
-    if tp.output and not v.successors:
-        raise ValueError(fmt % (n, ', '.join(tp.output)))
+    outs = [n for (n, out) in v.outputs.items() if not out.wires]
+    if outs:
+        raise ValueError(fmt % (n, ', '.join(outs)))
 
     fmt = 'Vertex %s has superfluous inputs: %s'
-    extra = preds[len(tp.input):]
+    extra = inputs[len(tp.input):]
     if extra:
         raise ValueError(fmt % (n, ', '.join(extra)))
-
-def check_vertices(vertices):
-    for v in vertices:
-        check_vertex(v)
 
 def main():
     types_path, circuit_path, test_path = [Path(p) for p in argv[1:]]
@@ -183,9 +170,13 @@ def main():
     types = load_types(types_path)
 
     vertices = load_circuit(circuit_path, types)
-    check_vertices(vertices)
+
+    for v in vertices:
+        check_vertex(v)
 
     infer_arities(vertices)
+
+    return
 
     OUTPUT.mkdir(exist_ok = True)
     render_module(vertices, circuit_name, OUTPUT)

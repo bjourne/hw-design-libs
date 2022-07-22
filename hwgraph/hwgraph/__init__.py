@@ -1,29 +1,38 @@
 # Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
+from collections import defaultdict
 class Type:
-    def __init__(self, name, input, output):
+    def __init__(self, name, input, output, constraints):
         self.name = name
         self.input = input
         self.output = output
+        self.constraints = constraints
 
     def __repr__(self):
         fmt = '%s[(%s -> %s)]'
         args = self.name, ', '.join(self.input), ', '.join(self.output)
         return fmt % args
 
+class Wire:
+    def __init__(self):
+        self.arity = None
+        self.value = None
+        self.destinations = []
+
 class Vertex:
-    def __init__(self, name, type, arity, value):
+    def __init__(self, name, type):
         self.name = name
         self.type = type
-        self.arity = arity
-        self.predecessors = []
-        self.value = value
         self.refer_by_name = False
 
-        # We don't yet support vertices with multiple outputs.
-        self.successors = []
+        self.input = []
+        self.output = {n : Wire() for n in type.output}
 
     def __repr__(self):
-        return 'Vertex<%s:%s:%s>' % (self.name, self.type, self.arity or '?')
+        return 'Vertex<%s:%s>' % (self.name, self.type)
+
+def connect_vertices(v_from, out, v_to):
+    v_to.input.append((v_from, out))
+    v_from.output[out].destinations.append(v_to)
 
 # All ops with two inputs.
 BINARY_OPS = {
