@@ -58,6 +58,12 @@ def mul(mv1, mv2):
 def div(mv1, mv2):
     return mul(mv1, pow(mv2, multivariate_const(-1)))
 
+def lookup_id(vars, id):
+    val = vars.get(id)
+    if val is not None:
+        return multivariate_const(val)
+    return multivariate_name(id)
+
 BINOPS = {
     Add : add, Sub : sub,
     Mult : mul, Div : div,
@@ -68,19 +74,21 @@ def eval(tree, vars):
     tp = type(tree)
     if tp == BinOp:
         l = eval(tree.left, vars)
-        r = eval(tree.right,vars )
+        r = eval(tree.right, vars)
         return BINOPS[type(tree.op)](l, r)
     elif tp == Name:
-        id = tree.id
-        val = vars.get(id)
-        if val is not None:
-            return multivariate_const(val)
-        return multivariate_name(id)
+        return lookup_id(vars, tree.id)
     elif tp == Constant:
-        return multivariate({() : tree.value})
+        return multivariate_const(tree.value)
     elif tp == UnaryOp:
         a = eval(tree.operand, vars)
         return mul(a, multivariate_const(-1))
+    elif tp == Attribute:
+        id = '%s.%s' % (tree.value.id, tree.attr)
+        return lookup_id(vars, id)
+    else:
+        print(dump(tree))
+        assert False
 
 def constrain2(mv, tp_op):
     by_var = defaultdict(lambda: defaultdict(int))

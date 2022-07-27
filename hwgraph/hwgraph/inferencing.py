@@ -17,14 +17,16 @@ def infer(v):
 
     input_wires = {n : v_in.output[pin]
                    for n, (v_in, pin) in zip(tp.input, v.input)}
-    inputs = {n : w.arity for n, w in input_wires.items()}
-    outputs = {n : w.arity for n, w in v.output.items()}
+    input_arities = {n : w.arity for n, w in input_wires.items()}
+    output_arities = {n : w.arity for n, w in v.output.items()}
+    input_values = {'%s.value' % n : w.value for n, w in input_wires.items()}
 
-    orig_vars = dict(inputs)
-    orig_vars.update(outputs)
+    orig_vars = dict(input_arities)
+    orig_vars.update(output_arities)
+    orig_vars.update(input_values)
+
     vars = dict(orig_vars)
     exprs = tp.constraints
-
     changed = False
     for expr in exprs:
         res = constrain(vars, expr)
@@ -34,9 +36,9 @@ def infer(v):
             continue
         var, op, arity = res
         if op == '==':
-            if var in outputs:
+            if var in output_arities:
                 v.output[var].arity = arity
-            elif var in inputs:
+            elif var in input_arities:
                 input_wires[var].arity = arity
             vars[var] = arity
         changed = True

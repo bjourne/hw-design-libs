@@ -56,14 +56,36 @@ def test_div():
     vars = {'lo' : 5}
     assert constrain(vars, 'lo/5 == o') == ('o', '==', 1)
 
-TYPE_CAT = Type('cat', ['i1', 'i2'], ['o'], ['i1 + i2 == o'])
-TYPE_ADD = Type('add', ['i1', 'i2'], ['o'], ['i1 == i2', 'i2 == o'])
-TYPE_CONST = Type('const', [], ['o'], [])
+def test_infer_attributes():
+    vars = {'lo.value' : 3, 'hi.value' : 8,
+            'o' : None}
+    expr = 'hi.value - lo.value + 1 == o'
+    assert constrain(vars, expr) == ('o', '==', 6)
+
+
+
+TYPE_CAT = Type('cat',
+                ['i1', 'i2'],
+                ['o'],
+                ['i1 + i2 == o'],
+                False)
+TYPE_ADD = Type('add',
+                ['i1', 'i2'],
+                ['o'],
+                ['i1 == i2', 'i2 == o'],
+                False)
+TYPE_CONST = Type('const', [], ['o'], [], False)
 TYPE_FULL_ADDER = Type('fa',
                        ['a', 'b', 'ci'],
                        ['s', 'co'],
-                       ['a == b'])
-
+                       ['a == b'],
+                       True)
+TYPE_SLICE = Type('slice',
+                  ['bits', 'hi', 'lo'],
+                  ['o'],
+                  ['hi.value > lo.value',
+                   'hi.value - lo.value + 1 == o'],
+                  False)
 
 def test_forward_cat():
     c1 = Vertex('c1', TYPE_CONST)
@@ -113,3 +135,20 @@ def test_backward_add():
 def test_full_adder():
     fa = Vertex('fa', TYPE_FULL_ADDER)
     assert not infer(fa)
+
+def test_value_inferencing():
+    sl = Vertex('sl', TYPE_SLICE)
+    assert not infer(sl)
+
+    c0 = Vertex('c0', TYPE_CONST)
+    c1 = Vertex('c1', TYPE_CONST)
+    c2 = Vertex('c2', TYPE_CONST)
+    connect_vertices(c0, 'o', sl)
+    connect_vertices(c1, 'o', sl)
+    connect_vertices(c2, 'o', sl)
+
+    c1.output['o'].value = 10
+    c2.output['o'].value = 5
+
+    assert infer(sl)
+    assert sl.output['o'].arity == 6
