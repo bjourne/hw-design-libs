@@ -82,6 +82,8 @@ def build(ctx):
     build_verilog_module(ctx, 'divider')
     build_verilog_module(ctx, 'gcd')
     build_verilog_module(ctx, 'matmul')
+    build_verilog_module(ctx, 'full_adder')
+    build_verilog_module(ctx, 'adder')
     build_verilator_tb(ctx, 'matmul')
 
     # GHDL stuff
