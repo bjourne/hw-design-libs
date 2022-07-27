@@ -1,5 +1,31 @@
 {
-    "predecessors" : {
+    "types" : {
+        "input" : ["clk", "rstn", "a", "b", "in_valid"],
+        "output" : ["in_ready", "out_valid", "o"],
+        "const" : ["c0_1", "c0_8", "c1_1", "c7_8", "c8_8", "c15_8"],
+
+        // Flip flops
+        "reg" : ["p", "reg_xy"],
+
+        // Logic
+        "and" : ["begin_p", "y_eq_0_and_p", "p_next"],
+        "not" : ["not_p"],
+
+        // Muxes
+        "if" : ["p_next2", "p_next3", "next", "next3"],
+
+        // Arith
+        "gt" : ["x_gt_y"],
+        "eq" : ["y_eq_0"],
+        "sub" : ["y_sub_x"],
+
+        // Concat
+        "cat" : ["cat_ab", "cat_yx", "cat_x_y_sub_x"],
+
+        // Slices
+        "slice" : ["x", "y"]
+    },
+    "inputs" : {
         // Slices
         "y" : ["reg_xy", "c7_8", "c0_8"],
         "x" : ["reg_xy", "c15_8", "c8_8"],
@@ -39,8 +65,12 @@
         "out_valid" : ["y_eq_0_and_p"]
     },
     "arities" : {
-        "1" : ["clk", "rstn", "in_valid", "in_ready", "out_valid"],
-        "8" : ["a", "b", "o"]
+        "1" : [
+            "clk.o", "rstn.o", "in_valid.o"
+        ],
+        "8" : [
+            "a.o", "b.o"
+        ]
     },
     "values" : {
         "c0_1" : 0,
@@ -50,31 +80,5 @@
         "c8_8" : 8,
         "c15_8" : 15
     },
-    "refer_by_name" : ["x", "y", "p"],
-    "types" : {
-        "input" : ["clk", "rstn", "a", "b", "in_valid"],
-        "output" : ["in_ready", "out_valid", "o"],
-        "const" : ["c0_1", "c0_8", "c1_1", "c7_8", "c8_8", "c15_8"],
-
-        // Flip flops
-        "reg" : ["p", "reg_xy"],
-
-        // Logic
-        "and" : ["begin_p", "y_eq_0_and_p", "p_next"],
-        "not" : ["not_p"],
-
-        // Muxes
-        "if" : ["p_next2", "p_next3", "next", "next3"],
-
-        // Arith
-        "gt" : ["x_gt_y"],
-        "eq" : ["y_eq_0"],
-        "sub" : ["y_sub_x"],
-
-        // Concat
-        "cat" : ["cat_ab", "cat_yx", "cat_x_y_sub_x"],
-
-        // Slices
-        "slice" : ["x", "y"]
-    }
+    "refer_by_name" : ["x", "y", "p"]
 }

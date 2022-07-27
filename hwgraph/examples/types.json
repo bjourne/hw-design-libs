@@ -38,8 +38,8 @@
         "input" : ["bits", "hi", "lo"],
         "output" : ["o"],
         "constraints" : [
-            "value(hi) > value(lo)",
-            "(value(hi) - value(lo)) + 1 == o"
+            "hi.value > lo.value",
+            "hi.value - lo.value + 1 == o"
         ]
     },
     "cast" : {
