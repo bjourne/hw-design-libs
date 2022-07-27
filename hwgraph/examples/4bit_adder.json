@@ -9,10 +9,10 @@
         "full_adder" : ["FA0", "FA1", "FA2", "FA3"]
     },
     "inputs" : {
-        "FA0" : ["a0", "b0", "ci"],
-        "FA1" : ["a1", "b1", "FA0.co"],
-        "FA2" : ["a2", "b2", "FA1.co"],
-        "FA3" : ["a3", "b3", "FA2.co"],
+        "FA0" : ["a0.o", "b0.o", "ci"],
+        "FA1" : ["a1.o", "b1.o", "FA0.co"],
+        "FA2" : ["a2.o", "b2.o", "FA1.co"],
+        "FA3" : ["a3.o", "b3.o", "FA2.co"],
 
         "s0" : ["FA0.s"],
         "s1" : ["FA1.s"],
