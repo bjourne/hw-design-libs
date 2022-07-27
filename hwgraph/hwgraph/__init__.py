@@ -1,11 +1,12 @@
 # Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
 from collections import defaultdict
 class Type:
-    def __init__(self, name, input, output, constraints):
+    def __init__(self, name, input, output, constraints, is_module):
         self.name = name
         self.input = input
         self.output = output
         self.constraints = constraints
+        self.is_module = is_module
 
     def __repr__(self):
         fmt = '%s[(%s) -> (%s)]'
@@ -17,6 +18,9 @@ class Wire:
         self.arity = None
         self.value = None
         self.destinations = []
+
+    def __repr__(self):
+        return 'Wire<%s, %s>' % (self.arity, self.destinations)
 
 class Vertex:
     def __init__(self, name, type):

@@ -11,6 +11,8 @@ from pathlib import Path
 TMPL_PATH = Path(__file__).parent / 'templates'
 ENV = Environment(loader = FileSystemLoader(TMPL_PATH),
                   undefined = StrictUndefined)
+INDENT = ' ' * 4
+
 def render_tmpl_to_file(tmpl_name, file_path, **kwargs):
     tmpl = ENV.get_template(tmpl_name)
     txt = tmpl.render(**kwargs)
@@ -77,8 +79,91 @@ def groupby_sort(seq, keyfun):
     grps = [(k, list(v)) for k, v in grps]
     return sorted(grps)
 
+def output_wire_name(v1, pin):
+    wire = v1.output[pin]
+    dests = wire.destinations
+    if len(dests) == 1:
+        v2 = dests[0]
+        if v2.type.name == 'output':
+            return v2.name, False, None
+    name = '%s_%s' % (v1.name, pin)
+    return name, True, wire.arity
+
+def input_wire_name(v1, pin):
+    if v1.type.name == 'input':
+        return v1.name
+    return '%s_%s' % (v1.name, pin)
+
+def render_submod_args(v):
+    output = [output_wire_name(v, n)
+              for n in v.type.output]
+    new_wires = [(n, a) for (n, new, a) in output if new]
+    output = [n for n, _, _ in output]
+    input = [input_wire_name(v2, pin)
+             for v2, pin in v.input]
+    return input + output, new_wires
+
+def type_name(v):
+    return v.type.name
+
+def vertex_arity(v):
+    tp = v.type.name
+    if tp in {'input', 'const'}:
+        return v.output['o'].arity
+    elif tp == 'output':
+        v, pin = v.input[0]
+        return v.output[pin].arity
+    assert False
+
+def group_inputs_and_outputs(by_type, input_tp, output_tp):
+    input = by_type['input']
+    output = by_type['output']
+    gr_ins = groupby_sort(input, vertex_arity)
+    gr_outs = groupby_sort(output, vertex_arity)
+    io_groups = [(input_tp, gr_ins), (output_tp, gr_outs)]
+    return io_groups, input, output
+
+def format_inouts(n, input, output):
+    input = ', '.join(v.name for v in input)
+    output = ', '.join(v.name for v in output)
+    if input and output:
+        return input + ',\n' + n * INDENT + output
+    return input + output
+
 def render_module(vertices, mod_name, path):
-    vs_by_type = dict(groupby_sort(vertices, lambda v: v.type.name))
+
+    def is_type(v, tp):
+        return type_name(v) == tp
+
+    vs_by_type = dict(groupby_sort(vertices, type_name))
+    io_groups, input, output = \
+        group_inputs_and_outputs(vs_by_type, 'input', 'output')
+
+    # Group registers by driving clock.
+    regs = vs_by_type.get('reg', [])
+    regs_per_clk = groupby_sort(regs, lambda v: v.input[0][0].name)
+
+    others, regs = partition(lambda v: is_type(v, 'reg'), vertices)
+    others, explicit = partition(lambda v: v.refer_by_name, others)
+    others, implicit = partition(lambda v: is_type(v, 'if'), others)
+    others, submods = partition(lambda v: is_type(v, 'full_adder'), others)
+
+    submods = list(submods)
+
+    submod_names = sorted({v.type.name for v in submods
+                           if v.type.is_module})
+    submods = [(v, render_submod_args(v)) for v in submods]
+
+    kwargs = {
+        'mod_name' : mod_name,
+        'submod_names' : submod_names,
+        'inouts' : format_inouts(1, input, output),
+        'io_groups' : io_groups,
+        'submods' : submods
+    }
+    render_tmpl_to_file('module2.v', path / f'{mod_name}.v', **kwargs)
+
+    return
 
     keyfun = lambda v: v.arity
     gr_ins = groupby_sort(vs_by_type['input'], keyfun)
@@ -113,7 +198,7 @@ def ansi_escape(s, tp, col):
 def fmt_arity(v, ind):
     size = max(5, len(v.name))
     if not ind:
-        ind = 'b' if v.arity == 1 else 'd'
+        ind = 'b' if vertex_arity(v) == 1 else 'd'
     return f'%{size}{ind}'
 
 def render_args(vs, quote):
@@ -132,23 +217,15 @@ def render_fmts(vs, ind):
     fmts = [ansi_escape(fmt, 1, col) for fmt, col in fmt_cols]
     return ' '.join(fmts)
 
-def render_tb(vertices, tests, mod_name, path):
-    vs_by_type = dict(groupby_sort(vertices, lambda v: v.type.name))
+def render_tb(types, vertices, tests, mod_name, path):
+    vs_by_type = dict(groupby_sort(vertices, type_name))
+    io_groups, input, output = \
+        group_inputs_and_outputs(vs_by_type, 'reg', 'wire')
+    inouts_no_clk, inouts_clk = partition(lambda v: v.name == 'clk', input)
 
-    ins = vs_by_type['input']
-    outs = vs_by_type['output']
-    inouts = ins + outs
+    cycle = Vertex('cycle', types['const'])
+    cycle.value = 0
 
-    keyfun = lambda v: v.arity
-    gr_ins = groupby_sort(ins, keyfun)
-    gr_outs = groupby_sort(outs, keyfun)
-    io_groups = [('reg', gr_ins), ('wire', gr_outs)]
-
-    inouts_no_clk, inouts_clk = partition(lambda v: v.name == 'clk', inouts)
-
-    # Monitoring setup.
-    cycle_tp = Type('const', [], [])
-    cycle = Vertex('cycle', cycle_tp, DEFAULT_INT_ARITY, 0)
     mon_verts = [cycle] + list(inouts_no_clk)
     disp_fmt = render_fmts(mon_verts, 's')
     disp_args = render_args(mon_verts, True)
@@ -159,7 +236,7 @@ def render_tb(vertices, tests, mod_name, path):
         'mod_name' : mod_name,
         'tests' : tests,
         'io_groups' : io_groups,
-        'inouts' : inouts,
+        'inouts' : format_inouts(2, input, output),
         'disp_fmt' : disp_fmt,
         'disp_args' : disp_args,
         'mon_fmt' : mon_fmt,

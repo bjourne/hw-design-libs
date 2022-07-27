@@ -48,8 +48,6 @@ module {{ mod_name }}_tb();
         {%- endfor %}
     end
     {{ mod_name }} dut (
-        {%- for v in inouts %}
-        .{{ v.name }}({{v.name}}){% if not loop.last %},{% endif %}
-        {%- endfor %}
+        {{ inouts }}
     );
 endmodule

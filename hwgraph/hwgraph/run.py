@@ -72,7 +72,8 @@ def load_types(path):
             n,
             d2['input'],
             d2['output'],
-            d2['constraints']
+            d2['constraints'],
+            d2.get('is_module') or False
         )
     return types
 
@@ -139,13 +140,17 @@ def main():
 
     infer_arities(vertices)
 
-    # OUTPUT.mkdir(exist_ok = True)
-    # render_module(vertices, circuit_name, OUTPUT)
+    OUTPUT.mkdir(exist_ok = True)
+    render_module(vertices, circuit_name, OUTPUT)
 
-    # tests = load_json(test_path)
-    # shuffle(tests)
+    tests = load_json(test_path)
+    shuffle(tests)
 
-    # render_tb(vertices, tests, circuit_name, OUTPUT)
+    render_tb(types, vertices, tests, circuit_name, OUTPUT)
+
+    return
+
+
 
     path = OUTPUT / f'{circuit_name}.png'
     plot_vertices(vertices, path, False, True, True)
