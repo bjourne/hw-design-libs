@@ -57,8 +57,6 @@ BALANCED_BINARY_OPS = {
     'eq', 'sub', 'add'
 }
 
-DEFAULT_INT_ARITY = 20
-
 TYPE_TO_SYMBOL = {
     'and' : '&',
     'xor' : '^',

@@ -1,10 +1,7 @@
 # Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
 from hwgraph.algebra import constrain
 
-def infer(vars, expr):
-    constraints = {}
-    expr = subst(vars, expr)
-    return constraints
+DEFAULT_INT_ARITY = 20
 
 def no_solution(vars, exprs):
     vs = ['%s == %s' % (n, v) for n, v in vars.items() if v is not None]
@@ -12,7 +9,7 @@ def no_solution(vars, exprs):
     err = fmt % ', '.join(vs + exprs)
     raise ValueError(err)
 
-def infer(v):
+def infer_vertex(v):
     tp = v.type
 
     input_wires = {n : v_in.output[pin]
@@ -43,6 +40,34 @@ def infer(v):
             vars[var] = arity
         changed = True
     return changed
+
+def infer_vertices(vertices):
+    changed = True
+    while changed:
+        changed = False
+        for v in vertices:
+            changed = changed or infer_vertex(v)
+
+    # Special treatment of arguments to slice vertices.
+    for v in vertices:
+        if v.type.name == 'slice':
+            for v_from, _ in v.input[1:]:
+                wire = v_from.output['o']
+                if wire.arity is not None:
+                    continue
+                dests = set(wire.destinations)
+                if len(dests) == 1:
+                    wire.arity = DEFAULT_INT_ARITY
+
+    missing = []
+    for v in vertices:
+        for pin, w in v.output.items():
+            if not w.arity:
+                missing.append('%s.%s' % (v.name, pin))
+
+    fmt = 'Cannot infer arities for %s. Explicit declaration necessary.'
+    if missing:
+        raise ValueError(fmt % ', '.join(missing))
 
 def main():
     c1 = Vertex('c1', Type('const', [], ['o'], []))

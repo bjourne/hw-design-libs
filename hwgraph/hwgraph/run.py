@@ -2,11 +2,10 @@
 from collections import defaultdict
 from hwgraph import (
     BINARY_OPS, BALANCED_BINARY_OPS,
-    DEFAULT_INT_ARITY,
     UNARY_OPS,
     Type, Vertex,
     connect_vertices)
-from hwgraph.inferencing import infer
+from hwgraph.inferencing import infer_vertices
 from hwgraph.plotting import plot_vertices, plot_expressions
 from hwgraph.verilog import render_module, render_tb
 from json import loads
@@ -22,23 +21,6 @@ def load_json(fname):
         lines = [l.strip() for l in f.readlines()]
         lines = [l for l in lines if not l.startswith('//')]
     return loads('\n'.join(lines))
-
-def infer_arities(vertices):
-    changed = True
-    while changed:
-        changed = False
-        for v in vertices:
-            changed = changed or infer(v)
-
-    missing = []
-    for v in vertices:
-        for pin, w in v.output.items():
-            if not w.arity:
-                missing.append('%s.%s' % (v.name, pin))
-
-    fmt = 'Cannot infer arities for %s. Explicit declaration necessary.'
-    if missing:
-        raise ValueError(fmt % ', '.join(missing))
 
 def vertex_get(vertices, name):
     v = vertices.get(name)
@@ -98,7 +80,7 @@ def load_circuit(path, types):
             connect_vertices(v_from, out, v_to)
 
     for n, v in circuit.get('values', {}).items():
-        vertices[n].value = v
+        vertices[n].output['o'].value = v
 
     for n in circuit['refer_by_name']:
         vertices[n].refer_by_name = True
@@ -114,7 +96,7 @@ def check_vertex(v):
         raise ValueError(fmt % (n, ', '.join(disc)))
 
     fmt = 'Constant %s has no value'
-    if tp.name == 'const' and v.value is None:
+    if tp.name == 'const' and v.output['o'].value is None:
         raise ValueError(fmt % n)
 
     fmt = 'Vertex %s has disconnected outputs: %s'
@@ -138,24 +120,22 @@ def main():
     for v in vertices:
         check_vertex(v)
 
-    infer_arities(vertices)
+    infer_vertices(vertices)
 
     OUTPUT.mkdir(exist_ok = True)
-    render_module(vertices, circuit_name, OUTPUT)
+    # render_module(vertices, circuit_name, OUTPUT)
 
-    tests = load_json(test_path)
-    shuffle(tests)
+    # tests = load_json(test_path)
+    # shuffle(tests)
 
-    render_tb(types, vertices, tests, circuit_name, OUTPUT)
+    # render_tb(types, vertices, tests, circuit_name, OUTPUT)
 
-    return
+    # path = OUTPUT / f'{circuit_name}.png'
+    # plot_vertices(vertices, path, True, False, True, True)
+
+    path = OUTPUT / f'{circuit_name}_statements.png'
+    plot_expressions(vertices, path, True)
 
 
-
-    path = OUTPUT / f'{circuit_name}.png'
-    plot_vertices(vertices, path, False, True, True)
-
-    # path = OUTPUT / f'{circuit_name}_statements.png'
-    # plot_expressions(vertices, path, True)
 
 main()
