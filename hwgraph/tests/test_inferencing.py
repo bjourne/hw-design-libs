@@ -1,6 +1,7 @@
 # Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
 from hwgraph import Type, Vertex, connect_vertices
-from hwgraph.inferencing2 import constrain
+from hwgraph.algebra import constrain
+from hwgraph.inferencing import infer
 
 def test_no_solutions():
     assert constrain({}, '10 < 0') == 'nosol'
@@ -51,36 +52,64 @@ def test_ineqs():
     assert constrain({}, '-8 < o') == ('o', '>', -8)
     assert constrain({}, '-8 < -o') == ('o', '<', 8)
 
+def test_div():
+    vars = {'lo' : 5}
+    assert constrain(vars, 'lo/5 == o') == ('o', '==', 1)
+
+TYPE_CAT = Type('cat', ['i1', 'i2'], ['o'], ['i1 + i2 == o'])
+TYPE_ADD = Type('add', ['i1', 'i2'], ['o'], ['i1 == i2', 'i2 == o'])
+TYPE_CONST = Type('const', [], ['o'], [])
+TYPE_FULL_ADDER = Type('fa',
+                       ['a', 'b', 'ci'],
+                       ['s', 'co'],
+                       ['a == b'])
 
 
+def test_forward_cat():
+    c1 = Vertex('c1', TYPE_CONST)
+    c1.output['o'].arity = 5
+    v = Vertex('v', TYPE_CAT)
 
-# def test_input_arities():
-#     c1 = Vertex('c1', Type('const', [], ['o']))
-#     c1.output['o'].arity = 5
-#     add = Vertex('sum', Type('add', ['i1', 'i2'], ['o']))
+    connect_vertices(c1, 'o', v)
+    connect_vertices(c1, 'o', v)
+    assert infer(v)
+    assert v.output['o'].arity == 10
 
-#     connect_vertices(c1, 'o', add)
-#     connect_vertices(c1, 'o', add)
-#     assert input_arities(add) == [5, 5]
+def test_backward_cat():
+    c1 = Vertex('c1', TYPE_CONST)
+    c2 = Vertex('c2', TYPE_CONST)
+    c1.output['o'].arity = 5
+    v = Vertex('v', TYPE_CAT)
+    v.output['o'].arity = 20
 
-# def test_forward_add():
-#     c1 = Vertex('c1', Type('const', [], ['o']))
-#     c1.output['o'].arity = 5
-#     add = Vertex('v', Type('add', ['i1', 'i2'], ['o']))
+    connect_vertices(c1, 'o', v)
+    connect_vertices(c2, 'o', v)
+    assert infer(v)
+    assert c2.output['o'].arity == 15
 
-#     connect_vertices(c1, 'o', add)
-#     connect_vertices(c1, 'o', add)
-#     assert forward(add)
+def test_forward_add():
+    c1 = Vertex('c1', TYPE_CONST)
+    c1.output['o'].arity = 5
+    v = Vertex('v', TYPE_ADD)
+    connect_vertices(c1, 'o', v)
+    connect_vertices(c1, 'o', v)
+    assert infer(v)
+    assert v.output['o'].arity == 5
 
-#     assert add.output['o'].arity == 5
+def test_backward_add():
+    c1 = Vertex('c1', TYPE_CONST)
+    c2 = Vertex('c2', TYPE_CONST)
+    c1.output['o'].arity = 5
+    v = Vertex('v', TYPE_ADD)
+    connect_vertices(c1, 'o', v)
+    connect_vertices(c2, 'o', v)
+    v.output['o'].arity = 10
+    try:
+        assert infer(v)
+        assert False
+    except ValueError:
+        pass
 
-# def test_forward_cat():
-#     c1 = Vertex('c1', Type('const', [], ['o']))
-#     c1.output['o'].arity = 5
-#     cat = Vertex('v', Type('cat', ['i1', 'i2'], ['o']))
-
-#     connect_vertices(c1, 'o', cat)
-#     connect_vertices(c1, 'o', cat)
-#     assert forward(cat)
-
-#     assert cat.output['o'].arity == 10
+def test_full_adder():
+    fa = Vertex('fa', TYPE_FULL_ADDER)
+    assert not infer(fa)

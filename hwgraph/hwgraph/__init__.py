@@ -8,7 +8,7 @@ class Type:
         self.constraints = constraints
 
     def __repr__(self):
-        fmt = '%s[(%s -> %s)]'
+        fmt = '%s[(%s) -> (%s)]'
         args = self.name, ', '.join(self.input), ', '.join(self.output)
         return fmt % args
 

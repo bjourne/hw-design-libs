@@ -49,8 +49,10 @@ def draw_label(v, draw_names):
     n = v.name
     tp = v.type.name
     tp_col = TYPE_TO_NAME_COLOR.get(tp, TYPE_TO_NAME_COLOR[None])
-    if tp in {'cast', 'cat', 'slice', 'reg', 'if'}:
+    if tp in {'cast', 'cat', 'if', 'reg', 'slice'}:
         label = tp
+    elif tp in {'full_adder'}:
+        return n
     elif tp == 'const':
         label = f'{v.value}'
     elif tp in {'input', 'output'}:
@@ -98,6 +100,32 @@ def style_edge(pt, v1, v2, draw_arities):
         style['label'] = ' %d' % v1.arity
     return style
 
+def style_edge2(v1, pin_out, v2, draw_arities):
+    color = 'black'
+    style = 'solid'
+    penwidth = 0.5
+    wire  = v1.output[pin_out]
+    if wire.arity != 1:
+        penwidth = 1.0
+    style = {
+        'color' : color,
+        'style' : style,
+        'penwidth' : penwidth
+    }
+
+    pin_in = v2.type.input[v2.input.index((v1, pin_out))]
+
+    if draw_arities:
+        style['label'] = ' %s' % wire.arity
+
+    if len(v2.input) > 1:
+        style['headlabel'] = pin_in
+
+    if len(v1.output) > 1:
+        style['taillabel'] = pin_out
+
+    return style
+
 def setup_graph():
     G = AGraph(strict = False, directed = True)
     graph_attrs = {
@@ -125,16 +153,25 @@ def plot_vertices(vertices, png_path,
                   draw_clk, draw_arities, draw_names):
     G = setup_graph()
 
+    tp_graphs = {}
     for v in vertices:
-        if v.name != 'clk' or draw_clk:
-            G.add_node(v.name,
-                       label = draw_label(v, draw_names),
-                       **style_node(v))
+        if v.name == 'clk' and not draw_clk:
+            continue
 
-    for v2 in vertices:
-        for i, v1 in enumerate(v2.predecessors):
-            if v1 and v1.name != 'clk' or draw_clk:
-                attrs = style_edge(i, v1, v2, draw_arities)
+        # Constraining nodes of the same type to the same rank looks
+        # good on small graphs.
+        tp = v.type.name
+        if tp not in tp_graphs:
+            tp_graphs[tp] = G.add_subgraph(name = tp, rank = 'same')
+        g = tp_graphs[tp]
+        g.add_node(v.name,
+                   label = draw_label(v, draw_names),
+                   **style_node(v))
+
+    for v1 in vertices:
+        for pin, wire in v1.output.items():
+            for v2 in wire.destinations:
+                attrs = style_edge2(v1, pin, v2, draw_arities)
                 G.add_edge(v1.name, v2.name, **attrs)
     G.draw(png_path, prog='dot')
 

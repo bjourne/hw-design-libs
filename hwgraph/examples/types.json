@@ -1,51 +1,60 @@
 {
     "input" : {
         "input" : [],
-        "output" : ["o"]
+        "output" : ["o"],
+        "constraints" : []
     },
     "output" : {
         "input" : ["i"],
-        "output" : []
+        "output" : [],
+        "constraints" : []
     },
     "const" : {
         "input" : [],
-        "output" : ["o"]
+        "output" : ["o"],
+        "constraints" : []
     },
     // Temporarily here
     "full_adder" : {
         "input" : ["a", "b", "ci"],
-        "output" : ["s", "co"]
+        "output" : ["s", "co"],
+        "constraints" : [
+            "a == 1",
+            "b == 1",
+            "s == 1",
+            "co == 1"
+        ]
     },
     // Structural
     "cat" : {
         "input" : ["i1", "i2"],
         "output" : ["o"],
-        "arity_constraints" : [
-            ["equals", ["add", "i1", "i2"], "o"]
+        "constraints" : [
+            "i1 + i2 == o"
         ]
     },
     "slice" : {
         "input" : ["bits", "hi", "lo"],
         "output" : ["o"],
-        "arity_constraints" : [
-            ["ge", "hi", "lo"],
-            ["equals", ["add", ["sub", "hi", "lo"], 1], "o"]
+        "constraints" : [
+            "value(hi) > value(lo)",
+            "(value(hi) - value(lo)) + 1 == o"
         ]
     },
     "cast" : {
         "input" : ["n", "i"],
         "output" : ["o"],
-        "arity_constraints" : [
-            ["equals", ["value", "n"], "o"],
-            ["ge", "i", ["value", "n"]]
+        "constraints" : [
+            "value(n) == o",
+            "i >= value(n)"
         ]
     },
     // Logic
     "not" : {
         "input" : ["i"],
         "output" : ["o"],
-        "arity_constraints" : [
-            ["equals", "i", "o"]
+        "constraints" : [
+            "i == o"
         ]
     },
 
@@ -53,81 +62,82 @@
     "eq" : {
         "input": ["i1", "i2"],
         "output": ["o"],
-        "arity_constraints" : [
-            ["equals", "o", 1],
-            ["equals", "i1", "i2"]
+        "constraints" : [
+            "o == 1",
+            "i1 == i2"
         ]
     },
     "gt" : {
         "input": ["i1", "i2"],
         "output": ["o"],
-        "arity_constraints" : [
-            ["equals", "o", 1],
-            ["equals", "i1", "i2"]
+        "constraints" : [
+            "o == 1",
+            "i1 == i2"
         ]
     },
     "ge" : {
         "input": ["i1", "i2"],
         "output": ["o"],
-        "arity_constraints" : [
-            ["equals", "o", 1],
-            ["equals", "i1", "i2"]
+        "constraints" : [
+            "o == 1",
+            "i1 == i2"
         ]
     },
     "shl" : {
         "input": ["bits", "i"],
         "output": ["o"],
-        "arity_constraints" : [
-            ["equals", "bits", "o"]
+        "constraints" : [
+            "bits == o"
         ]
     },
     "and" : {
         "input": ["i1", "i2"],
         "output": ["o"],
-        "arity_constraints" : [
-            ["equals", "i1", "i2"],
-            ["equals", "i2", "o"]
+        "constraints" : [
+            "i1 == i2",
+            "i2 == o"
         ]
     },
     "xor" : {
         "input": ["i1", "i2"],
         "output": ["o"],
-        "arity_constraints" : [
-            ["equals", "i1", "i2"],
-            ["equals", "i2", "o"]
+        "constraints" : [
+            "i1 == i2",
+            "i2 == o"
         ]
     },
     "or" : {
         "input": ["i1", "i2"],
         "output": ["o"],
-        "arity_constraints" : [
-            ["equals", "i1", "i2"],
-            ["equals", "i2", "o"]
+        "constraints" : [
+            "i1 == i2",
+            "i2 == o"
         ]
     },
     "sub" : {
         "input": ["i1", "i2"],
         "output": ["o"],
-        "arity_constraints" : [
-            ["equals", "i1", "i2"],
-            ["equals", "i2", "o"]
+        "constraints" : [
+            "i1 == i2",
+            "i2 == o"
         ]
     },
     "if" : {
         "input" : ["c", "i1", "i2"],
         "output" : ["o"],
-        "arity_constraints" : [
-            ["equals", "i1", "i2"],
-            ["equals", "i2", "o"],
-            ["equals", "c", 1]
+        "constraints" : [
+            "i1 == i2",
+            "i2 == o",
+            "c == 1"
+
         ]
     },
     "reg" : {
         "input" : ["clk", "i"],
         "output" : ["o"],
-        "arity_constraints" : [
-            ["equals", "clk", 1],
-            ["equals", "i", "o"]
+        "constraints" : [
+            "clk == 1",
+            "i == o"
         ]
     }
 }
