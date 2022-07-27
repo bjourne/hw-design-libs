@@ -1,5 +1,12 @@
 {
-    "predecessors" : {
+    "types" : {
+        "input" : ["a", "b", "ci"],
+        "output" : ["s", "co"],
+        "xor" : ["xor1", "xor2"],
+        "and" : ["and1", "and2"],
+        "or" : ["or1"]
+    },
+    "inputs" : {
         "xor1" : ["a", "b"],
         "xor2" : ["xor1", "ci"],
 
@@ -11,15 +18,8 @@
         "s" : ["xor2"],
         "co" : ["or1"]
     },
-    "types" : {
-        "input" : ["a", "b", "ci"],
-        "output" : ["s", "co"],
-        "xor" : ["xor1", "xor2"],
-        "and" : ["and1", "and2"],
-        "or" : ["or1"]
-    },
     "arities" : {
-        "1" : ["a", "b", "s", "ci", "co"]
+        "1" : ["a.o", "b.o", "ci.o"]
     },
     "refer_by_name" : [],
     "values" : {}
