@@ -130,11 +130,13 @@ def main():
 
     # render_tb(types, vertices, tests, circuit_name, OUTPUT)
 
-    # path = OUTPUT / f'{circuit_name}.png'
-    # plot_vertices(vertices, path, True, False, True, True)
+    path = OUTPUT / f'{circuit_name}.png'
+    plot_vertices(vertices, path,
+                  False, False, True,
+                  False, False)
 
-    path = OUTPUT / f'{circuit_name}_statements.png'
-    plot_expressions(vertices, path, True)
+    # path = OUTPUT / f'{circuit_name}_statements.png'
+    # plot_expressions(vertices, path, True)
 
 
 

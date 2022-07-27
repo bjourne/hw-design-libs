@@ -54,7 +54,8 @@ def draw_label(v, draw_names):
     elif tp in {'full_adder'}:
         return n
     elif tp == 'const':
-        label = f'{v.value}'
+        value = v.output['o'].value
+        label = str(value)
     elif tp in {'input', 'output'}:
         label = colorize(n, tp_col)
     elif tp in UNARY_OPS | BINARY_OPS:
@@ -100,31 +101,33 @@ def style_edge(pt, v1, v2, draw_arities):
         style['label'] = ' %d' % v1.arity
     return style
 
-def style_edge2(v1, pin_out, v2, draw_arities):
-    color = 'black'
+def style_edge2(v1, pin_out, v2, pin_in, draw_arities, draw_pins):
     style = 'solid'
     penwidth = 0.5
     wire  = v1.output[pin_out]
     if wire.arity != 1:
         penwidth = 1.0
-    style = {
+
+    tp2 = v2.type
+    pin_in_idx = tp2.input.index(pin_in)
+    tp2name = tp2.name
+    color = 'black'
+    if tp2name == 'if':
+        color = f'black;0.9999:%s' % IF_EDGE_ARROWHEAD_COLORS[pin_in_idx]
+
+    attrs = {
         'color' : color,
         'style' : style,
         'penwidth' : penwidth
     }
-
-    pin_in = v2.type.input[v2.input.index((v1, pin_out))]
-
     if draw_arities:
-        style['label'] = ' %s' % wire.arity
-
-    if len(v2.input) > 1:
-        style['headlabel'] = pin_in
-
-    if len(v1.output) > 1:
-        style['taillabel'] = pin_out
-
-    return style
+        attrs['label'] = ' %s' % wire.arity
+    if draw_pins:
+        if len(v2.input) > 1:
+            attrs['headlabel'] = pin_in
+        if len(v1.output) > 1:
+            attrs['taillabel'] = pin_out
+    return attrs
 
 def setup_graph():
     G = AGraph(strict = False, directed = True)
@@ -150,29 +153,37 @@ def setup_graph():
     return G
 
 def plot_vertices(vertices, png_path,
-                  draw_clk, draw_arities, draw_names):
+                  group_by_type, draw_clk, draw_names,
+                  draw_arities, draw_pins):
     G = setup_graph()
-
     tp_graphs = {}
     for v in vertices:
+        print(v.name, v.name == 'clk' and not draw_clk)
         if v.name == 'clk' and not draw_clk:
             continue
 
-        # Constraining nodes of the same type to the same rank looks
-        # good on small graphs.
-        tp = v.type.name
-        if tp not in tp_graphs:
-            tp_graphs[tp] = G.add_subgraph(name = tp, rank = 'same')
-        g = tp_graphs[tp]
+        g = G
+        if group_by_type:
+            # Constraining nodes of the same type to the same rank
+            # looks good on small graphs.
+            tp = v.type.name
+            if tp not in tp_graphs:
+                tp_graphs[tp] = G.add_subgraph(name = tp, rank = 'same')
+            g = tp_graphs[tp]
         g.add_node(v.name,
                    label = draw_label(v, draw_names),
                    **style_node(v))
 
-    for v1 in vertices:
-        for pin, wire in v1.output.items():
-            for v2 in wire.destinations:
-                attrs = style_edge2(v1, pin, v2, draw_arities)
-                G.add_edge(v1.name, v2.name, **attrs)
+    for v2 in vertices:
+        for i, (v1, pin_out) in enumerate(v2.input):
+            if v1.name == 'clk' and not draw_clk:
+                continue
+            pin_in = v2.type.input[i]
+            attrs = style_edge2(v1, pin_out, v2, pin_in,
+                                draw_arities,
+                                draw_pins)
+            G.add_edge(v1.name, v2.name, **attrs)
+
     G.draw(png_path, prog='dot')
 
 def expression_label_reg(v):
@@ -215,7 +226,6 @@ def expression_label_rec(parent, child, v_expr, edges):
                     for p in parent.predecessors])
     if tp == 'slice':
         return '[%s:%s]' % r_args[1:]
-        #return '%s[%s:%s]' % r_args
     elif tp == 'reg':
         return expression_label_reg(parent)
     elif tp == 'cast':
@@ -239,8 +249,28 @@ def expression_label_rec(parent, child, v_expr, edges):
         return r_args[0]
     assert False
 
+def expression_input2(v_at, v_succ, edges):
+    return expression_label_rec2(v_at, v_succ, edges)
+
+def expression_label_rec2(v_at, v_succ, edges):
+    tp = v_at.type.name
+    sym = escape(TYPE_TO_SYMBOL.get(tp, ''))
+
+    args = tuple([expression_input2(v, v_at, edges)
+                  for (v, _) in v_at.input])
+
+    if tp == 'output':
+        return args[0]
+    elif tp == 'input':
+        return colorize(v_at.name, TYPE_TO_NAME_COLOR[tp])
+    elif tp in BINARY_OPS:
+        s = '%s %s %s' % (args[0], sym, args[1])
+        return package_vertex(v_succ, v_at) % s
+    else:
+        assert False
+
 def expression_label(v, edges):
-    label = expression_label_rec(v, None, v, edges)
+    label = expression_label_rec2(v, None, edges)
     tp = v.type.name
     if tp != 'reg' and (v.refer_by_name or tp == 'output'):
         col = TYPE_TO_NAME_COLOR.get(tp, TYPE_TO_NAME_COLOR[None])
@@ -248,11 +278,14 @@ def expression_label(v, edges):
         label = f'{var} &larr; {label}'
     return f'<{label}>'
 
-def is_expression(v):
-    # Expressions are the following:
-    #   1) registers, ifs, and outputs
-    #   2) aliased vertices, unless they are slices
-    #   3) vertices whose successors can't "consume" them
+def owns_expression(v):
+
+    # A vertex owns an experssion if
+    #
+    #   1) it is a register, if, or output node;
+    #   2) it has an alias and is not a slice; or
+    #   3) it has an output pin connected to a vertex that cannot
+    #   "consume" it.
     tp = v.type.name
     if tp == 'slice':
         return False
@@ -260,22 +293,28 @@ def is_expression(v):
         return True
     elif v.refer_by_name:
         return True
-    for s in v.successors:
-        child_idx = s.predecessors.index(v)
-        if s.type.name in {'if', 'reg'} and child_idx != 0:
-            return True
+
+    # Fix this logic.
+    for pin, wire in v.output.items():
+        pass
+    # for s in v.successors:
+    #     child_idx = s.predecessors.index(v)
+    #     if s.type.name in {'if', 'reg'} and child_idx != 0:
+    #         return True
     return False
 
 
 def plot_expressions(vertices, png_path, draw_arities):
     G = setup_graph()
-    exprs = [v for v in vertices if is_expression(v)]
+    exprs = [v for v in vertices if owns_expression(v)]
+
     edges = set()
     for v in exprs:
         label = expression_label(v, edges)
         G.add_node(v.name,
                    label = label,
                    **style_node(v))
+
     for v1, v2, i in edges:
         kw = style_edge(i, v1, v2, draw_arities)
         G.add_edge(v1.name, v2.name, **kw)
