@@ -114,6 +114,8 @@ def style_edge2(v1, pin_out, v2, pin_in, draw_arities, draw_pins):
     color = 'black'
     if tp2name == 'if':
         color = f'black;0.9999:%s' % IF_EDGE_ARROWHEAD_COLORS[pin_in_idx]
+    elif tp2name == 'reg' and pin_in_idx == 0:
+        style = 'dashed'
 
     attrs = {
         'color' : color,
@@ -164,8 +166,6 @@ def plot_vertices(vertices, png_path,
 
         g = G
         if group_by_type:
-            # Constraining nodes of the same type to the same rank
-            # looks good on small graphs.
             tp = v.type.name
             if tp not in tp_graphs:
                 tp_graphs[tp] = G.add_subgraph(name = tp, rank = 'same')
@@ -173,7 +173,6 @@ def plot_vertices(vertices, png_path,
         g.add_node(v.name,
                    label = draw_label(v, draw_names),
                    **style_node(v))
-
     for v2 in vertices:
         for i, (v1, pin_out) in enumerate(v2.input):
             if v1.name == 'clk' and not draw_clk:
@@ -185,6 +184,7 @@ def plot_vertices(vertices, png_path,
             G.add_edge(v1.name, v2.name, **attrs)
 
     G.draw(png_path, prog='dot')
+    print(G)
 
 def expression_label_reg(v):
     col = TYPE_TO_NAME_COLOR['reg']
