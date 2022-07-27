@@ -1,6 +1,6 @@
 {%- for name in submod_names -%}
 `include "{{ name }}.v"
-{%- endfor %}
+{%- endfor -%}
 module {{ mod_name }} (
     {{ inouts }}
 );

@@ -52,6 +52,7 @@ def infer_vertices(vertices):
     for v in vertices:
         if v.type.name == 'slice':
             for v_from, _ in v.input[1:]:
+                assert v_from.type.name == 'const'
                 wire = v_from.output['o']
                 if wire.arity is not None:
                     continue
@@ -65,7 +66,7 @@ def infer_vertices(vertices):
             if not w.arity:
                 missing.append('%s.%s' % (v.name, pin))
 
-    fmt = 'Cannot infer arities for %s. Explicit declaration necessary.'
+    fmt = 'Cannot infer arities for %s. Explicit declarations necessary.'
     if missing:
         raise ValueError(fmt % ', '.join(missing))
 

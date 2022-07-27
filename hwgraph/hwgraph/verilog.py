@@ -1,5 +1,5 @@
 # Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
-from hwgraph import (BINARY_OPS, DEFAULT_INT_ARITY,
+from hwgraph import (BINARY_OPS,
                      UNARY_OPS, TYPE_TO_SYMBOL,
                      Type, Vertex,
                      package_vertex)
