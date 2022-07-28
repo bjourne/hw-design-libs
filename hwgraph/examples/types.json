@@ -125,6 +125,14 @@
             "i2 == o"
         ]
     },
+    "add" : {
+        "input": ["i1", "i2"],
+        "output": ["o"],
+        "constraints" : [
+            "i1 == i2",
+            "i2 == o"
+        ]
+    },
     "if" : {
         "input" : ["c", "i1", "i2"],
         "output" : ["o"],
