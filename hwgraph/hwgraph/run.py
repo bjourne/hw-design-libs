@@ -41,8 +41,11 @@ def port_get(types, vertices, port):
         name, out = port, 'o'
     v = vertex_get(vertices, name)
     tp = v.type
+
     if out not in tp.output:
-        raise ValueError(f'No {out} output for {tp.name}')
+        err = 'Vertex %s:%s has no %s output'
+        raise ValueError(err % (v.name, tp.name, out))
+
     return v, tp.output.index(out)
 
 def load_types(path):
@@ -55,7 +58,8 @@ def load_types(path):
             d2['input'],
             d2['output'],
             d2['constraints'],
-            d2.get('is_module') or False
+            d2.get('is_module') or False,
+            d2.get('optional_outputs') or False
         )
     return types
 
@@ -99,10 +103,12 @@ def check_vertex(v):
     if tp.name == 'const' and v.output[0].value is None:
         raise ValueError(fmt % n)
 
-    fmt = 'Vertex %s has disconnected outputs: %s'
-    outs = [wire for wire in v.output if not wire.destinations]
-    if outs:
-        raise ValueError(fmt % (n, ', '.join(outs)))
+    if not v.type.optional_outputs:
+        fmt = 'Vertex %s has disconnected outputs: %s'
+        outs = [n for (n, wire) in zip(v.type.output, v.output)
+                if not wire.destinations]
+        if outs:
+            raise ValueError(fmt % (n, ', '.join(outs)))
 
     fmt = 'Vertex %s has superfluous inputs: %s'
     extra = input[len(tp.input):]
@@ -123,20 +129,20 @@ def main():
     infer_vertices(vertices)
 
     OUTPUT.mkdir(exist_ok = True)
-    render_module(vertices, circuit_name, OUTPUT)
+    #render_module(vertices, circuit_name, OUTPUT)
 
-    tests = load_json(test_path)
-    shuffle(tests)
+    # tests = load_json(test_path)
+    # shuffle(tests)
 
-    render_tb(types, vertices, tests, circuit_name, OUTPUT)
+    # render_tb(types, vertices, tests, circuit_name, OUTPUT)
 
     path = OUTPUT / f'{circuit_name}.png'
     plot_vertices(vertices, path,
                   False, False, True,
-                  True, False)
+                  False, False)
 
     path = OUTPUT / f'{circuit_name}_statements.png'
-    plot_expressions(vertices, path, True, True)
+    plot_expressions(vertices, path, False, True)
 
 
 

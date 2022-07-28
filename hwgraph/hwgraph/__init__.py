@@ -2,12 +2,14 @@
 from collections import defaultdict
 
 class Type:
-    def __init__(self, name, input, output, constraints, is_module):
+    def __init__(self, name, input, output, constraints,
+                 is_module, optional_outputs):
         self.name = name
         self.input = input
         self.output = output
         self.constraints = constraints
         self.is_module = is_module
+        self.optional_outputs = optional_outputs
 
     def __repr__(self):
         fmt = '%s[(%s) -> (%s)]'
@@ -35,9 +37,9 @@ class Vertex:
     def __repr__(self):
         return 'Vertex<%s:%s>' % (self.name, self.type)
 
-def connect_vertices(src, pin, dst):
-    dst.input.append((src, pin))
-    src.output[pin].destinations.append(dst)
+def connect_vertices(src, pin_idx, dst):
+    dst.input.append((src, pin_idx))
+    src.output[pin_idx].destinations.append(dst)
 
 # All ops with two inputs.
 BINARY_OPS = {

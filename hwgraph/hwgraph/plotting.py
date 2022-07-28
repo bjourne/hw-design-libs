@@ -111,7 +111,7 @@ def setup_graph():
         'ranksep' : 0.3,
         'fontname' : 'Inconsolata',
         'bgcolor' : 'transparent',
-        'rankdir' : 'TB'
+        'rankdir' : 'TB',
     }
     G.graph_attr.update(graph_attrs)
     node_attrs = {
@@ -155,81 +155,46 @@ def expression_label_reg(v):
         return '{ %s |{%s}}' % (top, slices) if slices else top
     return slices
 
-# def expression_input(parent, child, v_expr, edges):
-#     parent_tp = parent.type.name
-#     child_tp = child.type.name
-#     parent_idx = child.predecessors.index(parent)
-#     if child_tp in {'reg', 'if'} and parent_idx != 0:
-#         edges.add((parent, v_expr, parent_idx))
-#         return None
-#     elif parent.refer_by_name or parent_tp == 'output':
-#         col = TYPE_TO_NAME_COLOR.get(parent_tp, TYPE_TO_NAME_COLOR[None])
-#         return colorize(parent.name, col)
-#     elif parent_tp in {'if', 'reg'}:
-#         edges.add((parent, v_expr, parent_idx))
-#         return '*'
-#     return expression_label_rec(parent, child, v_expr, edges)
+def port_out_name(v, out_pin):
+    n = v.name
+    output = v.type.output
+    if len(output) == 1:
+        assert out_pin == 0
+        return n
+    return '%s.%s' % (n, output[out_pin])
 
-# def expression_label_rec(parent, child, v_expr, edges):
-#     tp = parent.type.name
-#     sym = escape(TYPE_TO_SYMBOL.get(tp, ''))
-#     r_args = tuple([expression_input(p, parent, v_expr, edges)
-#                     for p in parent.predecessors])
-#     if tp == 'slice':
-#         return '[%s:%s]' % r_args[1:]
-#     elif tp == 'reg':
-#         return expression_label_reg(parent)
-#     elif tp == 'cast':
-#         return "%s'(%s)" % r_args
-#     elif tp == 'const':
-#         val = parent.value
-#         return str(val)
-#     elif tp == 'output':
-#         return r_args[0]
-#     elif tp == 'input':
-#         return colorize(parent.name, TYPE_TO_NAME_COLOR[tp])
-#     elif tp in UNARY_OPS:
-#         return '%s%s' % (sym, r_args[0])
-#     elif tp in BINARY_OPS:
-#         s = '%s %s %s' % (r_args[0], sym, r_args[1])
-#         return package_vertex(parent, child) % s
-#     elif tp == 'cat':
-#         s = '%s, %s' % (r_args[0], r_args[1])
-#         return package_vertex(parent, child) % s
-#     elif tp == 'if':
-#         return r_args[0]
-#     assert False
-
-def expression_input(src, dst, pin_in_idx, edges):
+def expression_input(src, dst, root, pin_in_idx, edges):
     dst_tp = dst.type.name
     src_tp = src.type.name
     col = TYPE_TO_NAME_COLOR.get(src_tp, TYPE_TO_NAME_COLOR[None])
     if dst_tp in {'reg', 'if'} and pin_in_idx != 0:
-        edges.add((src, dst, pin_in_idx))
+        edges.add((src, root, pin_in_idx))
         return None
     elif src_tp == 'output':
         return colorize(src.name, col)
     elif src.refer_by_name:
         _, pin_out_idx = dst.input[pin_in_idx]
-        s = '%s.%s' % (src.name, src.type.output[pin_out_idx])
+        s = port_out_name(src, pin_out_idx)
         return colorize(s, col)
     elif src_tp in {'if', 'reg'} or src.type.is_module:
-        edges.add((src, dst, pin_in_idx))
+        edges.add((src, root, pin_in_idx))
         return '*'
-    return expression_label_rec2(src, dst, edges)
+    return expression_label_rec2(src, dst, root, edges)
 
-def expression_label_rec2(src, dst, edges):
+def expression_label_rec2(src, dst, root, edges):
     tp = src.type.name
     name = src.name
     sym = escape(TYPE_TO_SYMBOL.get(tp, ''))
 
-    args = tuple([expression_input(v, src, pin_in_idx, edges)
+    args = tuple([expression_input(v, src, root, pin_in_idx, edges)
                   for pin_in_idx, (v, _) in enumerate(src.input)])
 
     if tp == 'output':
         return args[0]
     elif tp == 'slice':
         return '[%s:%s]' % args[1:]
+    elif tp == 'cast':
+        return "%s'(%s)" % args
     elif tp == 'if':
         return args[0]
     elif tp == 'full_adder':
@@ -253,7 +218,7 @@ def expression_label_rec2(src, dst, edges):
         assert False
 
 def expression_label(v, edges):
-    label = expression_label_rec2(v, None, edges)
+    label = expression_label_rec2(v, None, v, edges)
     tp = v.type.name
     if tp != 'reg' and (v.refer_by_name or tp == 'output'):
         col = TYPE_TO_NAME_COLOR.get(tp, TYPE_TO_NAME_COLOR[None])
@@ -294,6 +259,9 @@ def plot_vertices(vertices, png_path,
     G = setup_graph()
     tp_graphs = {}
 
+    # For gcd.json, sorting by type improves the layout a lot.
+    vertices = sorted(vertices, key = lambda v: v.type.name)
+
     for v in vertices:
         if v.name == 'clk' and not draw_clk:
             continue
@@ -319,7 +287,6 @@ def plot_expressions(vertices, png_path,
                      draw_arities):
 
     vertices = [v for v in vertices if owns_expression(v)]
-
     G = setup_graph()
     tp_graphs = {}
     edges = set()
@@ -335,6 +302,8 @@ def plot_expressions(vertices, png_path,
 
     for v1, v2, pin_in_idx in edges:
         kw = style_edge(v2, pin_in_idx, draw_arities, False)
+        assert v1 in vertices
+        assert v2 in vertices
         G.add_edge(v1.name, v2.name, **kw)
 
     # Create invisible eges between vertices lacking edges.

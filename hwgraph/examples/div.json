@@ -1,5 +1,55 @@
 {
-    "predecessors" : {
+    "types": {
+        "input" : [
+            "clk", "rstn",
+            "in_valid",
+            "a", "b"
+        ],
+        "output" : [
+            "in_ready", "out_valid", "r", "q", "dbz"
+        ],
+        "reg" : ["p", "i", "acq", "b1"],
+
+        "eq" : ["i_eq_0", "b1_eq_0"],
+        "and" : ["i_eq_0_and_p", "begin_p", "next_p"],
+        "not" : ["not_p"],
+
+        // Slices
+        "slice" : [
+            "sl_r_fr_next_acq", "q1",
+            "sl_q_fr_next_acq",
+            "ac"
+        ],
+        "cast" : ["ac_sub_b1"],
+
+        // Shl
+        "shl" : ["acq_shl"],
+
+        // Cats
+        "cat" : [
+            "cat_a0", "cat_0a0", "cat_ac_ge_b1",
+            "cat_ac_ge_b1_2",
+            "pad_b1"
+        ],
+
+        // Airth
+        "sub" : ["i_sub_1", "ac_sub_b1_int"],
+        "ge" : ["ac_ge_b1"],
+
+        // Muxes
+        "if" : [
+            "next_i", "next_p2", "next_p3",
+            "next_acq", "next_acq2",
+            "next_b1"
+        ],
+        "const" : [
+            "c0_1", "c1_1",
+            "c0_4", "c7_4",
+            "c0_8", "c1_8", "c7_8", "c8_8", "c9_8",
+            "c16_8"
+        ]
+    },
+    "inputs" : {
         "i_eq_0" : ["i", "c0_4"],
         "i_eq_0_and_p" : ["i_eq_0", "p"],
 
@@ -56,56 +106,6 @@
         "r" : ["sl_r_fr_next_acq"],
         "dbz" : ["b1_eq_0"]
     },
-    "types": {
-        "input" : [
-            "clk", "rstn",
-            "in_valid",
-            "a", "b"
-        ],
-        "output" : [
-            "in_ready", "out_valid", "r", "q", "dbz"
-        ],
-        "reg" : ["p", "i", "acq", "b1"],
-
-        "eq" : ["i_eq_0", "b1_eq_0"],
-        "and" : ["i_eq_0_and_p", "begin_p", "next_p"],
-        "not" : ["not_p"],
-
-        // Slices
-        "slice" : [
-            "sl_r_fr_next_acq", "q1",
-            "sl_q_fr_next_acq",
-            "ac"
-        ],
-        "cast" : ["ac_sub_b1"],
-
-        // Shl
-        "shl" : ["acq_shl"],
-
-        // Cats
-        "cat" : [
-            "cat_a0", "cat_0a0", "cat_ac_ge_b1",
-            "cat_ac_ge_b1_2",
-            "pad_b1"
-        ],
-
-        // Airth
-        "sub" : ["i_sub_1", "ac_sub_b1_int"],
-        "ge" : ["ac_ge_b1"],
-
-        // Muxes
-        "if" : [
-            "next_i", "next_p2", "next_p3",
-            "next_acq", "next_acq2",
-            "next_b1"
-        ],
-        "const" : [
-            "c0_1", "c1_1",
-            "c0_4", "c7_4",
-            "c0_8", "c1_8", "c7_8", "c8_8", "c9_8",
-            "c16_8"
-        ]
-    },
     "refer_by_name" : [
         "ac", "b1", "p", "i", "q1",
         "begin_p", "acq"
@@ -123,8 +123,8 @@
         "c16_8" : 16
     },
     "arities": {
-        "1" : ["clk", "rstn", "in_valid", "in_ready", "out_valid", "dbz"],
+        "1" : ["clk.o", "rstn.o", "in_valid.o"],
         "4" : ["i", "c0_4"],
-        "8" : ["a", "b", "q", "r"]
+        "8" : ["a.o", "b.o"]
     }
 }

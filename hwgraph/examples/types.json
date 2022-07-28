@@ -6,8 +6,9 @@
     },
     "output" : {
         "input" : ["i"],
-        "output" : [],
-        "constraints" : []
+        "output" : ["o"],
+        "constraints" : ["i == o"],
+        "optional_outputs": true
     },
     "const" : {
         "input" : [],
@@ -45,9 +46,10 @@
     "cast" : {
         "input" : ["n", "i"],
         "output" : ["o"],
+        "is_module" : false,
         "constraints" : [
-            "value(n) == o",
-            "i >= value(n)"
+            "n.value == o",
+            "i >= n.value"
         ]
     },
     // Logic
