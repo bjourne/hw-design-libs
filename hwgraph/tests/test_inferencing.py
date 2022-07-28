@@ -1,7 +1,8 @@
 # Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
-from hwgraph import Type, Vertex, connect_vertices
+from hwgraph import Vertex, connect_vertices
 from hwgraph.algebra import constrain
 from hwgraph.inferencing import infer_vertex
+from hwgraph.types import TYPES
 
 def test_no_solutions():
     assert constrain({}, '10 < 0') == 'nosol'
@@ -78,42 +79,10 @@ def test_infer_attributes():
     expr = 'hi.value - lo.value + 1 == o'
     assert constrain(vars, expr) == ('o', '==', 6)
 
-
-
-TYPE_CAT = Type('cat',
-                ['i1', 'i2'],
-                ['o'],
-                ['i1 + i2 == o'],
-                False)
-TYPE_ADD = Type('add',
-                ['i1', 'i2'],
-                ['o'],
-                ['i1 == i2', 'i2 == o'],
-                False)
-TYPE_CONST = Type('const', [], ['o'], [], False)
-TYPE_FULL_ADDER = Type('fa',
-                       ['a', 'b', 'ci'],
-                       ['s', 'co'],
-                       ['a == b'],
-                       True)
-TYPE_SLICE = Type('slice',
-                  ['bits', 'hi', 'lo'],
-                  ['o'],
-                  ['hi.value > lo.value',
-                   'hi.value - lo.value + 1 == o'],
-                  False)
-
-TYPE_CAST = Type('cast',
-                 ['n', 'i'],
-                 ['o'],
-                 ['n.value == o',
-                  'i >= n.value'],
-                 False)
-
 def test_forward_cat():
-    c1 = Vertex('c1', TYPE_CONST)
+    c1 = Vertex('c1', TYPES['const'])
     c1.output[0].arity = 5
-    v = Vertex('v', TYPE_CAT)
+    v = Vertex('v', TYPES['cat'])
 
     connect_vertices(c1, 0, v)
     connect_vertices(c1, 0, v)
@@ -121,10 +90,10 @@ def test_forward_cat():
     assert v.output[0].arity == 10
 
 def test_backward_cat():
-    c1 = Vertex('c1', TYPE_CONST)
-    c2 = Vertex('c2', TYPE_CONST)
+    c1 = Vertex('c1', TYPES['const'])
+    c2 = Vertex('c2', TYPES['const'])
     c1.output[0].arity = 5
-    v = Vertex('v', TYPE_CAT)
+    v = Vertex('v', TYPES['cat'])
     v.output[0].arity = 20
 
     connect_vertices(c1, 0, v)
@@ -133,19 +102,19 @@ def test_backward_cat():
     assert c2.output[0].arity == 15
 
 def test_forward_add():
-    c1 = Vertex('c1', TYPE_CONST)
+    c1 = Vertex('c1', TYPES['const'])
     c1.output[0].arity = 5
-    v = Vertex('v', TYPE_ADD)
+    v = Vertex('v', TYPES['add'])
     connect_vertices(c1, 0, v)
     connect_vertices(c1, 0, v)
     assert infer_vertex(v)
     assert v.output[0].arity == 5
 
 def test_backward_add():
-    c1 = Vertex('c1', TYPE_CONST)
-    c2 = Vertex('c2', TYPE_CONST)
+    c1 = Vertex('c1', TYPES['const'])
+    c2 = Vertex('c2', TYPES['const'])
     c1.output[0].arity = 5
-    v = Vertex('v', TYPE_ADD)
+    v = Vertex('v', TYPES['add'])
     connect_vertices(c1, 0, v)
     connect_vertices(c2, 0, v)
     v.output[0].arity = 10
@@ -156,16 +125,16 @@ def test_backward_add():
         pass
 
 def test_full_adder():
-    fa = Vertex('fa', TYPE_FULL_ADDER)
-    assert not infer_vertex(fa)
+    fa = Vertex('fa', TYPES['full_adder'])
+    assert infer_vertex(fa)
 
 def test_value_inferencing():
-    sl = Vertex('sl', TYPE_SLICE)
+    sl = Vertex('sl', TYPES['slice'])
     assert not infer_vertex(sl)
 
-    c0 = Vertex('c0', TYPE_CONST)
-    c1 = Vertex('c1', TYPE_CONST)
-    c2 = Vertex('c2', TYPE_CONST)
+    c0 = Vertex('c0', TYPES['const'])
+    c1 = Vertex('c1', TYPES['const'])
+    c2 = Vertex('c2', TYPES['const'])
     connect_vertices(c0, 0, sl)
     connect_vertices(c1, 0, sl)
     connect_vertices(c2, 0, sl)
@@ -177,9 +146,9 @@ def test_value_inferencing():
     assert sl.output[0].arity == 6
 
 def test_infer_cast():
-    n = Vertex('c0', TYPE_CONST)
-    i = Vertex('c1', TYPE_CONST)
-    cast = Vertex('v', TYPE_CAST)
+    n = Vertex('c0', TYPES['const'])
+    i = Vertex('c1', TYPES['const'])
+    cast = Vertex('v', TYPES['cast'])
 
     connect_vertices(n, 0, cast)
     connect_vertices(i, 0, cast)

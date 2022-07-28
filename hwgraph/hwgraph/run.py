@@ -3,24 +3,19 @@ from collections import defaultdict
 from hwgraph import (
     BINARY_OPS, BALANCED_BINARY_OPS,
     UNARY_OPS,
-    Type, Vertex,
+    Vertex,
     connect_vertices)
+
 from hwgraph.inferencing import infer_vertices
 from hwgraph.plotting import plot_vertices, plot_expressions
+from hwgraph.types import type_get
+from hwgraph.utils import load_json
 from hwgraph.verilog import render_module, render_tb
-from json import loads
 from pathlib import Path
 from random import shuffle
 from sys import argv
 
 OUTPUT = Path('output')
-
-def load_json(fname):
-    # I like having comments in JSON.
-    with open(fname, 'r') as f:
-        lines = [l.strip() for l in f.readlines()]
-        lines = [l for l in lines if not l.startswith('//')]
-    return loads('\n'.join(lines))
 
 def vertex_get(vertices, name):
     v = vertices.get(name)
@@ -28,13 +23,7 @@ def vertex_get(vertices, name):
         raise ValueError(f'Missing vertex: {name}')
     return v
 
-def type_get(types, name):
-    tp = types.get(name)
-    if not tp:
-        raise ValueError(f'Missing type: {name}')
-    return tp
-
-def port_get(types, vertices, port):
+def port_get(vertices, port):
     if '.' in port:
         name, out = port.split('.')
     else:
@@ -45,7 +34,6 @@ def port_get(types, vertices, port):
     if out not in tp.output:
         err = 'Vertex %s:%s has no %s output'
         raise ValueError(err % (v.name, tp.name, out))
-
     return v, tp.output.index(out)
 
 def load_types(path):
@@ -63,24 +51,24 @@ def load_types(path):
         )
     return types
 
-def load_circuit(path, types):
+def load_circuit(path):
     print(f'Loading circuit from {path}.')
     circuit = load_json(path)
     vertices = {}
     for tp_name, ns in circuit['types'].items():
-        tp = type_get(types, tp_name)
+        tp = type_get(tp_name)
         for n in ns:
             vertices[n] = Vertex(n, tp)
     for ar, ns in circuit['arities'].items():
         ar = int(ar)
         for n in ns:
-            v, pin = port_get(types, vertices, n)
+            v, pin = port_get(vertices, n)
             v.output[pin].arity = ar
 
     for v_to, ports in circuit['inputs'].items():
         v_to = vertex_get(vertices, v_to)
         for port in ports:
-            v_from, out = port_get(types, vertices, port)
+            v_from, out = port_get(vertices, port)
             connect_vertices(v_from, out, v_to)
 
     for n, v in circuit.get('values', {}).items():
@@ -116,12 +104,12 @@ def check_vertex(v):
         raise ValueError(fmt % (n, ', '.join(extra)))
 
 def main():
-    types_path, circuit_path, test_path = [Path(p) for p in argv[1:]]
+    circuit_path, test_path = [Path(p) for p in argv[1:]]
     circuit_name = circuit_path.stem
 
-    types = load_types(types_path)
+    #types = load_types(types_path)
 
-    vertices = load_circuit(circuit_path, types)
+    vertices = load_circuit(circuit_path)
 
     for v in vertices:
         check_vertex(v)

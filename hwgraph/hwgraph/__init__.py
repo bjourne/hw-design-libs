@@ -1,21 +1,6 @@
 # Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
 from collections import defaultdict
 
-class Type:
-    def __init__(self, name, input, output, constraints,
-                 is_module, optional_outputs):
-        self.name = name
-        self.input = input
-        self.output = output
-        self.constraints = constraints
-        self.is_module = is_module
-        self.optional_outputs = optional_outputs
-
-    def __repr__(self):
-        fmt = '%s[(%s) -> (%s)]'
-        args = self.name, ', '.join(self.input), ', '.join(self.output)
-        return fmt % args
-
 class Wire:
     def __init__(self):
         self.arity = None

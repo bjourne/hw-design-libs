@@ -1,7 +1,7 @@
 # Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
 from hwgraph import (BINARY_OPS,
                      UNARY_OPS, TYPE_TO_SYMBOL,
-                     Type, Vertex,
+                     Vertex,
                      package_vertex)
 from itertools import groupby
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, Template

@@ -286,6 +286,9 @@ def plot_expressions(vertices, png_path,
                      group_by_type,
                      draw_arities):
 
+    # Sorting helps Graphviz
+    vertices = sorted(vertices, key = lambda v: v.type.name)
+
     vertices = [v for v in vertices if owns_expression(v)]
     G = setup_graph()
     tp_graphs = {}
