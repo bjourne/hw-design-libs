@@ -84,7 +84,7 @@ def load_circuit(path, types):
 
     for n in circuit['refer_by_name']:
         vertices[n].refer_by_name = True
-    return vertices.values()
+    return list(vertices.values())
 
 def check_vertex(v):
     tp, n = v.type, v.name
@@ -135,8 +135,8 @@ def main():
                   False, False, True,
                   False, False)
 
-    # path = OUTPUT / f'{circuit_name}_statements.png'
-    # plot_expressions(vertices, path, True)
+    path = OUTPUT / f'{circuit_name}_statements.png'
+    plot_expressions(vertices, path, True)
 
 
 
