@@ -24,6 +24,10 @@ def test_satisfies():
     vars = {'hi' : 3, 'lo' : 0}
     assert constrain(vars, 'hi > lo') == 'satisfies'
 
+    vars = {'i' : 9, 'n.value' : 8}
+    assert constrain(vars, 'i >= n.value') == 'satisfies'
+    assert constrain(vars, 'n.value <= i') == 'satisfies'
+
 def test_basic():
     vars = {'hi' : 20, 'lo' : 9}
     res = constrain(vars, 'hi - lo == o')
@@ -99,6 +103,13 @@ TYPE_SLICE = Type('slice',
                    'hi.value - lo.value + 1 == o'],
                   False)
 
+TYPE_CAST = Type('cast',
+                 ['n', 'i'],
+                 ['o'],
+                 ['n.value == o',
+                  'i >= n.value'],
+                 False)
+
 def test_forward_cat():
     c1 = Vertex('c1', TYPE_CONST)
     c1.output[0].arity = 5
@@ -164,3 +175,17 @@ def test_value_inferencing():
 
     assert infer_vertex(sl)
     assert sl.output[0].arity == 6
+
+def test_infer_cast():
+    n = Vertex('c0', TYPE_CONST)
+    i = Vertex('c1', TYPE_CONST)
+    cast = Vertex('v', TYPE_CAST)
+
+    connect_vertices(n, 0, cast)
+    connect_vertices(i, 0, cast)
+
+    n.output[0].value = 8
+    cast.output[0].arity = 8
+
+    # Not enough to infer arity of i.
+    assert not infer_vertex(cast)

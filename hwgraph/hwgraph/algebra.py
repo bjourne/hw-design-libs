@@ -3,6 +3,13 @@ from ast import *
 from collections import Counter, defaultdict
 from fractions import Fraction
 from functools import reduce
+from operator import gt, ge, eq, le, lt
+
+CMP_DATA = {Gt : ('>', gt), GtE : ('>=', ge),
+            Eq : ('==', eq),
+            Lt : ('<', lt), LtE : ('<=', le)}
+
+ANTI_CMP = {Gt : Lt, GtE : LtE, Lt : Gt, LtE : GtE, Eq : Eq}
 
 def parse_expr(expr):
     return parse(expr).body[0].value
@@ -41,9 +48,6 @@ def pow(mv1, mv2):
     if pows1 == ():
         return multivariate_const(Fraction(c1)**c2)
     assert False
-
-
-
 
 def mul(mv1, mv2):
     mv3 = multivariate_const(0)
@@ -100,21 +104,10 @@ def constrain2(mv, tp_op):
 
     n_vars = len(by_var)
     if n_vars == 0:
-        if tp_op == Gt:
-            if c_term > 0:
-                return 'satisfies'
-            else:
-                return 'nosol'
-        elif tp_op == Lt:
-            if c_term < 0:
-                return 'satisfies'
-            else:
-                return 'nosol'
-        elif tp_op == Eq:
-            if c_term == 0:
-                return 'satisfies'
-            else:
-                return 'nosol'
+        fun = CMP_DATA[tp_op][1]
+        if fun(c_term, 0):
+            return 'satisfies'
+        return 'nosol'
     elif n_vars > 1:
         # Can't constrain multiple variables.
         return 'many'
@@ -127,16 +120,10 @@ def constrain2(mv, tp_op):
     p, q = -cs[0], cs[1]
     sp, sq = p < 0, q < 0
     rat = Fraction(p, q)
-    symbols = {Gt : '>', GtE : '>=',
-               Lt : '<', LtE : '<=',
-               Eq : '=='}
-
-    oppo = {Gt : Lt, GtE : LtE,
-            Lt : Gt, LtE : GtE, Eq : Eq}
     if sq:
-        tp_op = oppo[tp_op]
+        tp_op = ANTI_CMP[tp_op]
 
-    return var, symbols[tp_op], rat
+    return var, CMP_DATA[tp_op][0], rat
 
 def constrain(vars, expr):
     tree = parse_expr(expr)
