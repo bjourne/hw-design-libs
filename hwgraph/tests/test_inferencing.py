@@ -1,7 +1,7 @@
 # Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
 from hwgraph import Type, Vertex, connect_vertices
 from hwgraph.algebra import constrain
-from hwgraph.inferencing import infer
+from hwgraph.inferencing import infer_vertex
 
 def test_no_solutions():
     assert constrain({}, '10 < 0') == 'nosol'
@@ -89,66 +89,66 @@ TYPE_SLICE = Type('slice',
 
 def test_forward_cat():
     c1 = Vertex('c1', TYPE_CONST)
-    c1.output['o'].arity = 5
+    c1.output[0].arity = 5
     v = Vertex('v', TYPE_CAT)
 
-    connect_vertices(c1, 'o', v)
-    connect_vertices(c1, 'o', v)
-    assert infer(v)
-    assert v.output['o'].arity == 10
+    connect_vertices(c1, 0, v)
+    connect_vertices(c1, 0, v)
+    assert infer_vertex(v)
+    assert v.output[0].arity == 10
 
 def test_backward_cat():
     c1 = Vertex('c1', TYPE_CONST)
     c2 = Vertex('c2', TYPE_CONST)
-    c1.output['o'].arity = 5
+    c1.output[0].arity = 5
     v = Vertex('v', TYPE_CAT)
-    v.output['o'].arity = 20
+    v.output[0].arity = 20
 
-    connect_vertices(c1, 'o', v)
-    connect_vertices(c2, 'o', v)
-    assert infer(v)
-    assert c2.output['o'].arity == 15
+    connect_vertices(c1, 0, v)
+    connect_vertices(c2, 0, v)
+    assert infer_vertex(v)
+    assert c2.output[0].arity == 15
 
 def test_forward_add():
     c1 = Vertex('c1', TYPE_CONST)
-    c1.output['o'].arity = 5
+    c1.output[0].arity = 5
     v = Vertex('v', TYPE_ADD)
-    connect_vertices(c1, 'o', v)
-    connect_vertices(c1, 'o', v)
-    assert infer(v)
-    assert v.output['o'].arity == 5
+    connect_vertices(c1, 0, v)
+    connect_vertices(c1, 0, v)
+    assert infer_vertex(v)
+    assert v.output[0].arity == 5
 
 def test_backward_add():
     c1 = Vertex('c1', TYPE_CONST)
     c2 = Vertex('c2', TYPE_CONST)
-    c1.output['o'].arity = 5
+    c1.output[0].arity = 5
     v = Vertex('v', TYPE_ADD)
-    connect_vertices(c1, 'o', v)
-    connect_vertices(c2, 'o', v)
-    v.output['o'].arity = 10
+    connect_vertices(c1, 0, v)
+    connect_vertices(c2, 0, v)
+    v.output[0].arity = 10
     try:
-        assert infer(v)
+        assert infer_vertex(v)
         assert False
     except ValueError:
         pass
 
 def test_full_adder():
     fa = Vertex('fa', TYPE_FULL_ADDER)
-    assert not infer(fa)
+    assert not infer_vertex(fa)
 
 def test_value_inferencing():
     sl = Vertex('sl', TYPE_SLICE)
-    assert not infer(sl)
+    assert not infer_vertex(sl)
 
     c0 = Vertex('c0', TYPE_CONST)
     c1 = Vertex('c1', TYPE_CONST)
     c2 = Vertex('c2', TYPE_CONST)
-    connect_vertices(c0, 'o', sl)
-    connect_vertices(c1, 'o', sl)
-    connect_vertices(c2, 'o', sl)
+    connect_vertices(c0, 0, sl)
+    connect_vertices(c1, 0, sl)
+    connect_vertices(c2, 0, sl)
 
-    c1.output['o'].value = 10
-    c2.output['o'].value = 5
+    c1.output[0].value = 10
+    c2.output[0].value = 5
 
-    assert infer(sl)
-    assert sl.output['o'].arity == 6
+    assert infer_vertex(sl)
+    assert sl.output[0].arity == 6
