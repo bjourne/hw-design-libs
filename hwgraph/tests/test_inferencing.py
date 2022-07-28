@@ -52,6 +52,18 @@ def test_ineqs():
     assert constrain({}, '-8 < o') == ('o', '>', -8)
     assert constrain({}, '-8 < -o') == ('o', '<', 8)
 
+def test_gte_or_lte():
+    vars = {'lo' : None}
+    assert constrain(vars, 'lo >= 3') == ('lo', '>=', 3)
+    assert constrain(vars, '-lo >= 3') == ('lo', '<=', -3)
+    assert constrain(vars, 'lo >= -3') == ('lo', '>=', -3)
+    assert constrain(vars, '-lo >= -3') == ('lo', '<=', 3)
+
+    assert constrain(vars, 'lo <= 3') == ('lo', '<=', 3)
+    assert constrain(vars, 'lo <= -3') == ('lo', '<=', -3)
+    assert constrain(vars, '-lo <= 3') == ('lo', '>=', -3)
+    assert constrain(vars, '-lo <= -3') == ('lo', '>=', 3)
+
 def test_div():
     vars = {'lo' : 5}
     assert constrain(vars, 'lo/5 == o') == ('o', '==', 1)

@@ -123,17 +123,20 @@ def constrain2(mv, tp_op):
     var, cs = by_var[0]
     cs[0] = c_term
 
-    # Don't get this.
+    # Not sure about the sign stuff.
     p, q = -cs[0], cs[1]
     sp, sq = p < 0, q < 0
+    rat = Fraction(p, q)
+    symbols = {Gt : '>', GtE : '>=',
+               Lt : '<', LtE : '<=',
+               Eq : '=='}
 
-    cmps = {Gt : '>', Eq : '==', Lt : '<'}
-    if (sp, sq) == (True, True):
-        cmps = {Gt : '<', Eq : '==', Lt : '>'}
-    elif (sp, sq) == (False, True):
-        cmps = {Gt : '<', Eq : '==', Lt : '>'}
-    return var, cmps[tp_op], Fraction(p, q)
+    oppo = {Gt : Lt, GtE : LtE,
+            Lt : Gt, LtE : GtE, Eq : Eq}
+    if sq:
+        tp_op = oppo[tp_op]
 
+    return var, symbols[tp_op], rat
 
 def constrain(vars, expr):
     tree = parse_expr(expr)
