@@ -79,14 +79,14 @@ def groupby_sort(seq, keyfun):
     grps = [(k, list(v)) for k, v in grps]
     return sorted(grps)
 
-def output_wire_name(v1, pin):
-    wire = v1.output[pin]
+def output_name(v1, pin_idx):
+    wire = v1.output[pin_idx]
     dests = wire.destinations
     if len(dests) == 1:
         v2 = dests[0]
         if v2.type.name == 'output':
             return v2.name, False, None
-    name = '%s_%s' % (v1.name, pin)
+    name = '%s_%s' % (v1.name, v1.type.output[pin_idx])
     return name, True, wire.arity
 
 def input_wire_name(v1, pin):
@@ -95,8 +95,7 @@ def input_wire_name(v1, pin):
     return '%s_%s' % (v1.name, pin)
 
 def render_submod_args(v):
-    output = [output_wire_name(v, n)
-              for n in v.type.output]
+    output = [output_name(v, i) for i in range(len(v.output))]
     new_wires = [(n, a) for (n, new, a) in output if new]
     output = [n for n, _, _ in output]
     input = [input_wire_name(v2, pin)
@@ -109,10 +108,10 @@ def type_name(v):
 def vertex_arity(v):
     tp = v.type.name
     if tp in {'input', 'const'}:
-        return v.output['o'].arity
+        return v.output[0].arity
     elif tp == 'output':
         v, pin = v.input[0]
-        return v.output[pin].arity
+        return v.output[0].arity
     assert False
 
 def group_inputs_and_outputs(by_type, input_tp, output_tp):
@@ -162,32 +161,6 @@ def render_module(vertices, mod_name, path):
         'submods' : submods
     }
     render_tmpl_to_file('module2.v', path / f'{mod_name}.v', **kwargs)
-
-    return
-
-    keyfun = lambda v: v.arity
-    gr_ins = groupby_sort(vs_by_type['input'], keyfun)
-    gr_outs = groupby_sort(vs_by_type['output'], keyfun)
-    io_groups = [('input', gr_ins), ('output', gr_outs)]
-
-    # Group registers by driving clock.
-    regs = vs_by_type.get('reg', [])
-    regs_per_clk = groupby_sort(regs, lambda v: v.predecessors[0].name)
-
-    others, regs = partition(lambda v: v.type.name == 'reg', vertices)
-    others, explicit = partition(lambda v: v.refer_by_name, others)
-    others, implicit = partition(lambda v: v.type.name == 'if', others)
-
-    kwargs = {
-        'inouts' : vs_by_type['input'] + vs_by_type['output'],
-        'io_groups' : io_groups,
-        'explicit' :  list(explicit),
-        'implicit' : list(implicit),
-        'outputs' : vs_by_type['output'],
-        'regs_per_clk' : regs_per_clk,
-        'mod_name' : mod_name,
-    }
-    render_tmpl_to_file('module.v', path / f'{mod_name}.v', **kwargs)
 
 def flatten(seq):
     return [y for x in seq for y in x]

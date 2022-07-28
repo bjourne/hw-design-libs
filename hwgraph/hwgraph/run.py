@@ -43,7 +43,7 @@ def port_get(types, vertices, port):
     tp = v.type
     if out not in tp.output:
         raise ValueError(f'No {out} output for {tp.name}')
-    return v, out
+    return v, tp.output.index(out)
 
 def load_types(path):
     print(f'Loading types from {path}.')
@@ -70,8 +70,8 @@ def load_circuit(path, types):
     for ar, ns in circuit['arities'].items():
         ar = int(ar)
         for n in ns:
-            v, out = port_get(types, vertices, n)
-            v.output[out].arity = ar
+            v, pin = port_get(types, vertices, n)
+            v.output[pin].arity = ar
 
     for v_to, ports in circuit['inputs'].items():
         v_to = vertex_get(vertices, v_to)
@@ -80,7 +80,7 @@ def load_circuit(path, types):
             connect_vertices(v_from, out, v_to)
 
     for n, v in circuit.get('values', {}).items():
-        vertices[n].output['o'].value = v
+        vertices[n].output[0].value = v
 
     for n in circuit['refer_by_name']:
         vertices[n].refer_by_name = True
@@ -96,11 +96,11 @@ def check_vertex(v):
         raise ValueError(fmt % (n, ', '.join(disc)))
 
     fmt = 'Constant %s has no value'
-    if tp.name == 'const' and v.output['o'].value is None:
+    if tp.name == 'const' and v.output[0].value is None:
         raise ValueError(fmt % n)
 
     fmt = 'Vertex %s has disconnected outputs: %s'
-    outs = [n for (n, out) in v.output.items() if not out.destinations]
+    outs = [wire for wire in v.output if not wire.destinations]
     if outs:
         raise ValueError(fmt % (n, ', '.join(outs)))
 
@@ -123,20 +123,20 @@ def main():
     infer_vertices(vertices)
 
     OUTPUT.mkdir(exist_ok = True)
-    # render_module(vertices, circuit_name, OUTPUT)
+    render_module(vertices, circuit_name, OUTPUT)
 
-    # tests = load_json(test_path)
-    # shuffle(tests)
+    tests = load_json(test_path)
+    shuffle(tests)
 
-    # render_tb(types, vertices, tests, circuit_name, OUTPUT)
+    render_tb(types, vertices, tests, circuit_name, OUTPUT)
 
     path = OUTPUT / f'{circuit_name}.png'
     plot_vertices(vertices, path,
                   False, False, True,
-                  False, False)
+                  True, False)
 
     path = OUTPUT / f'{circuit_name}_statements.png'
-    plot_expressions(vertices, path, True)
+    plot_expressions(vertices, path, True, True)
 
 
 

@@ -1,5 +1,6 @@
 # Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
 from collections import defaultdict
+
 class Type:
     def __init__(self, name, input, output, constraints, is_module):
         self.name = name
@@ -29,14 +30,14 @@ class Vertex:
         self.refer_by_name = False
 
         self.input = []
-        self.output = {n : Wire() for n in type.output}
+        self.output = [Wire() for _ in type.output]
 
     def __repr__(self):
         return 'Vertex<%s:%s>' % (self.name, self.type)
 
-def connect_vertices(v_from, out, v_to):
-    v_to.input.append((v_from, out))
-    v_from.output[out].destinations.append(v_to)
+def connect_vertices(src, pin, dst):
+    dst.input.append((src, pin))
+    src.output[pin].destinations.append(dst)
 
 # All ops with two inputs.
 BINARY_OPS = {

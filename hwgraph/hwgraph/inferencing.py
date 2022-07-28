@@ -14,8 +14,10 @@ def infer_vertex(v):
 
     input_wires = {n : v_in.output[pin]
                    for n, (v_in, pin) in zip(tp.input, v.input)}
+    output_wires = {n : w for n, w in zip(tp.output, v.output)}
+
     input_arities = {n : w.arity for n, w in input_wires.items()}
-    output_arities = {n : w.arity for n, w in v.output.items()}
+    output_arities = {n : w.arity for n, w in output_wires.items()}
     input_values = {'%s.value' % n : w.value for n, w in input_wires.items()}
 
     orig_vars = dict(input_arities)
@@ -34,7 +36,7 @@ def infer_vertex(v):
         var, op, arity = res
         if op == '==':
             if var in output_arities:
-                v.output[var].arity = arity
+                output_wires[var].arity = arity
             elif var in input_arities:
                 input_wires[var].arity = arity
             vars[var] = arity
@@ -53,7 +55,7 @@ def infer_vertices(vertices):
         if v.type.name == 'slice':
             for v_from, _ in v.input[1:]:
                 assert v_from.type.name == 'const'
-                wire = v_from.output['o']
+                wire = v_from.output[0]
                 if wire.arity is not None:
                     continue
                 dests = set(wire.destinations)
@@ -62,9 +64,9 @@ def infer_vertices(vertices):
 
     missing = []
     for v in vertices:
-        for pin, w in v.output.items():
+        for i, w in enumerate(v.output):
             if not w.arity:
-                missing.append('%s.%s' % (v.name, pin))
+                missing.append('%s.%s' % (v.name, v.type.output[i]))
 
     fmt = 'Cannot infer arities for %s. Explicit declarations necessary.'
     if missing:
@@ -78,7 +80,6 @@ def main():
     connect_vertices(c1, 'o', v)
     connect_vertices(c1, 'o', v)
     v.output['o'].arity = None
-    print(forward(v))
 
 if __name__ == '__main__':
     main()
