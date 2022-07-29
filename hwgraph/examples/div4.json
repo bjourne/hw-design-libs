@@ -1,0 +1,113 @@
+// This divider uses the pctrl module
+{
+    "types": {
+        "input" : [
+            "clk", "rstn",
+            "in_valid",
+            "a", "b"
+        ],
+        "output" : [
+            "in_ready", "out_valid", "r", "q", "dbz"
+        ],
+        "reg" : ["acq", "b1"],
+
+        "eq" : ["b1_eq_0"],
+
+        "pctrl" : ["pctrl"],
+
+        // Slices
+        "slice" : [
+            "sl_r_fr_next_acq", "q1",
+            "sl_q_fr_next_acq",
+            "ac"
+        ],
+        "cast" : ["ac_sub_b1"],
+
+        // Shl
+        "shl" : ["acq_shl"],
+
+        // Cats
+        "cat" : [
+            "cat_a0", "cat_0a0", "cat_ac_ge_b1",
+            "cat_ac_ge_b1_2",
+            "pad_b1"
+        ],
+
+        // Airth
+        "sub" : ["ac_sub_b1_int"],
+        "ge" : ["ac_ge_b1"],
+
+        // Muxes
+        "if" : [
+            "next_acq", "next_acq2",
+            "next_b1"
+        ],
+        "const" : [
+            "c0_1", "c1_1",
+            "c0_8", "c1_8", "c7_8", "c8_8", "c9_8",
+            "c16_8"
+        ]
+    },
+    "inputs" : {
+
+        // Pctrl
+        "pctrl" : ["clk", "rstn", "c7_8", "in_valid"],
+        "in_ready" : ["pctrl.in_ready"],
+        "out_valid" : ["pctrl.out_valid"],
+
+        // Arith
+        "ac_ge_b1" : ["ac", "pad_b1"],
+        "ac_sub_b1_int" : ["ac", "pad_b1"],
+        "b1_eq_0" : ["b1", "c0_8"],
+
+        // Shift lefts
+        "acq_shl" : ["acq", "c1_8"],
+
+        // Cats
+        "cat_a0" : ["a", "c0_1"],
+        "cat_0a0" : ["c0_8", "cat_a0"],
+        "cat_ac_ge_b1" : ["ac_sub_b1", "q1"],
+        "cat_ac_ge_b1_2" : ["cat_ac_ge_b1", "c1_1"],
+
+        "pad_b1" : ["c0_1", "b1"],
+
+        // Registers
+        "acq" : ["clk", "next_acq"],
+        "b1" : ["clk", "next_b1"],
+
+        // Muxes
+        "next_b1" : ["pctrl.start", "b", "b1"],
+
+        "next_acq" : ["pctrl.start", "cat_0a0", "next_acq2"],
+        "next_acq2" : ["ac_ge_b1", "cat_ac_ge_b1_2", "acq_shl"],
+
+        // Slices
+        "sl_r_fr_next_acq" : ["next_acq", "c16_8", "c9_8"],
+        "sl_q_fr_next_acq" : ["next_acq", "c7_8", "c0_8"],
+        "q1" : ["acq", "c7_8", "c0_8"],
+        "ac" : ["acq", "c16_8", "c8_8"],
+        "ac_sub_b1" : ["c8_8", "ac_sub_b1_int"],
+
+        // Outputs
+        "q" : ["sl_q_fr_next_acq"],
+        "r" : ["sl_r_fr_next_acq"],
+        "dbz" : ["b1_eq_0"]
+    },
+    "refer_by_name" : [
+        "ac", "b1", "q1", "acq", "pctrl"
+    ],
+    "values" : {
+        "c0_1" : 0,
+        "c1_1" : 1,
+        "c0_8" : 0,
+        "c1_8" : 1,
+        "c7_8" : 7,
+        "c8_8" : 8,
+        "c9_8" : 9,
+        "c16_8" : 16
+    },
+    "arities": {
+        "1" : ["clk.o", "rstn.o", "in_valid.o"],
+        "8" : ["a.o", "b.o", "c1_8"]
+    }
+}

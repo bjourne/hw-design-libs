@@ -16,6 +16,16 @@
         "constraints" : []
     },
     // Temporarily here
+    "pctrl" : {
+        "input" : ["clk", "rstn", "cnt", "in_valid"],
+        "output" : ["start", "in_ready", "out_valid"],
+        "is_module" : true,
+        "constraints" : [
+            "in_ready == 1",
+            "out_valid == 1",
+            "cnt == 8"
+        ]
+    },
     "full_adder" : {
         "input" : ["a", "b", "ci"],
         "output" : ["s", "co"],

@@ -130,7 +130,7 @@ def setup_graph():
         'ranksep' : 0.3,
         'fontname' : 'Inconsolata',
         'bgcolor' : 'transparent',
-        'rankdir' : 'TB',
+        'rankdir' : 'TB'
     }
     G.graph_attr.update(graph_attrs)
     node_attrs = {
@@ -302,6 +302,8 @@ def bfs_order(vertices):
 def plot_vertices(vertices, png_path,
                   group_by_type, draw_clk, draw_names,
                   draw_arities, draw_pins):
+
+    print('Plotting %d vertices to %s.' % (len(vertices), png_path))
 
     G = setup_graph()
     tp_graphs = {}
