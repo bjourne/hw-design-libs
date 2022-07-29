@@ -1,0 +1,10 @@
+[{
+    "name" : "Trivial test",
+    "exec" : [
+        ["set", {"cnt" : 10, "set" : 1}],
+        ["tick", 1],
+        ["set", {"set" : 0}],
+        ["tick", 10],
+        ["assert", {"timeout": 1}]
+    ]
+}]

@@ -1,0 +1,29 @@
+{
+    "types" : {
+        "output" : ["timeout"],
+        "input" : [
+            "clk", "set", "cnt"
+        ],
+        "reg" : ["i"],
+        "eq" : ["i_eq_0"],
+        "sub" : ["i_sub_1"],
+        "if" : ["next"],
+        "const" : ["c1_8", "c0_8"]
+    },
+    "inputs" : {
+        "i" : ["clk", "next"],
+        "i_eq_0" : ["i", "c0_8"],
+        "i_sub_1" : ["i", "c1_8"],
+        "timeout" : ["i_eq_0"],
+        "next" : ["set", "cnt", "i_sub_1"]
+    },
+    "arities" : {
+        "1" : ["set.o"],
+        "8" : ["cnt.o"]
+    },
+    "values" : {
+        "c0_8" : 0,
+        "c1_8" : 1
+    },
+    "refer_by_name" : ["i"]
+}
