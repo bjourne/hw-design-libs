@@ -9,7 +9,7 @@ module {{ mod_name }} (
     {%- endfor %}
     {%- endfor %}
 
-    {%- if regs_per_clk %}
+    {% if regs_per_clk -%}
     // Registers
     {%- for clk, regs in regs_per_clk %}
     {%- for v in regs %}
@@ -37,15 +37,15 @@ module {{ mod_name }} (
     {%- endfor %}
     {%- endif %}
 
-    {%- if partitions['if'] %}
+    {% if partitions['if'] -%}
     // Wires for ifs
     {%- for v in partitions['if'] %}
     {{ render_lval('wire', v) }} = {{ render_rval(v, 0, None) }};
     {%- endfor %}
     {%- endif %}
 
-    {%- if submods %}
-    // Wires between instances
+    {% if submods -%}
+    // Wires connecting output from instances
     {%- for v, (_, new_wires) in submods %}
     {%- for n, a in new_wires %}
     wire [{{ a - 1 }}:0] {{ n }};
@@ -53,14 +53,14 @@ module {{ mod_name }} (
     {%- endfor %}
     {%- endif %}
 
-    {%- if submods %}
+    {% if submods -%}
     // Instances
     {%- for v, (args, _) in submods %}
-    {{ v.type.name }} {{ v.name }} ({{ args|join(', ') }});
+    {{ v.type.name }} {{ v.name }} ({{ args }});
     {%- endfor %}
     {%- endif %}
 
-    {%- if output_exprs %}
+    {% if output_exprs -%}
     // Explicit output wires
     {%- for v in output_exprs %}
     {{ render_lval('wire', v) }} = {{ render_rval(v, 0, None) }};

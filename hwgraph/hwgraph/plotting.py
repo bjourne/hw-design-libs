@@ -4,16 +4,19 @@ from hwgraph import UNARY_OPS, BINARY_OPS, Vertex, package_expr
 from hwgraph.types import TYPE_SYMBOLS, TYPES
 from pygraphviz import AGraph
 
-TYPE_TO_NAME_COLOR = {
-    'output' : '#bb77bb',
-    'input' : '#cc8877',
+
+# Colors for referencing vertices.
+TYPE_NAME_COLORS = {
+    TYPES['output'] : '#bb77bb',
+    TYPES['input'] : '#cc8877',
 
     # Slices and registers have the same color since they usually
     # refer to the same data.
-    'reg' : '#7788aa',
-    'slice' : '#7788aa',
-    None : '#6ca471'
+    TYPES['reg'] : '#7788aa',
+    TYPES['slice'] : '#7788aa'
 }
+DEFAULT_NAME_COLOR = '#6ca471'
+
 IF_EDGE_ARROWHEAD_COLORS = {
     0 : 'black',
     1 : '#00aa00',
@@ -47,24 +50,24 @@ def colorize(s, col):
 def draw_label(v, draw_names):
     n = v.name
     tp = v.type.name
-    tp_col = TYPE_TO_NAME_COLOR.get(tp, TYPE_TO_NAME_COLOR[None])
 
+    col = TYPE_NAME_COLORS.get(v.type, DEFAULT_NAME_COLOR)
     if v.type.is_module:
-        label = n
+        label = tp
     elif tp in {'cast', 'cat', 'if', 'reg', 'slice'}:
         label = tp
     elif v.type == TYPES['const']:
         value = v.output[0].value
         label = str(value)
     elif tp in {'input', 'output'}:
-        label = colorize(n, tp_col)
+        label = colorize(n, col)
     elif tp in UNARY_OPS | BINARY_OPS:
         label = escape(TYPE_SYMBOLS.get(tp, ''))
     else:
         assert False
 
     if v.refer_by_name and draw_names:
-        var = colorize(n, tp_col)
+        var = colorize(n, col)
         label = f'{var} &larr; {label}'
     return f'<{label}>'
 
@@ -149,7 +152,7 @@ def get_input_wire(dst, idx):
     return src.output[pin]
 
 def expression_label_reg(v):
-    col = TYPE_TO_NAME_COLOR['reg']
+    col = TYPE_NAME_COLORS[v.type]
     fmt = '%s &larr; [%d:%d]'
 
     arity = v.output[0].arity
@@ -171,12 +174,17 @@ def expression_label_reg(v):
     return slices
 
 def expression_label_module(v, args):
-    return '{ %s |{%s}}' % (v.name, ', '.join(args))
+    top = v.type.name
+    if v.refer_by_name:
+        var = colorize(v.name, DEFAULT_NAME_COLOR)
+        top = '%s &larr; %s' % (var, top)
+    return '{ %s |{%s}}' % (top, ', '.join(args))
 
 def port_out_name(v, out_pin):
     n = v.name
-    output = v.type.output
-    if len(output) == 1:
+    tp = v.type
+    output = tp.output
+    if len(output) == 1 and not tp.is_module:
         assert out_pin == 0
         return n
     return '%s.%s' % (n, output[out_pin])
@@ -184,7 +192,7 @@ def port_out_name(v, out_pin):
 def expression_input(src, dst, root, pin_in_idx, edges):
     dst_tp = dst.type.name
     src_tp = src.type.name
-    col = TYPE_TO_NAME_COLOR.get(src_tp, TYPE_TO_NAME_COLOR[None])
+    col = TYPE_NAME_COLORS.get(src.type, DEFAULT_NAME_COLOR)
     if dst_tp in {'reg', 'if'} and pin_in_idx != 0:
         assert len(src.output) == 1
         edges.add((src, root, src.output[0], pin_in_idx))
@@ -223,7 +231,7 @@ def expression_label_rec(src, dst, root, edges):
     elif tp == 'reg':
         return expression_label_reg(src)
     elif tp == 'input':
-        return colorize(name, TYPE_TO_NAME_COLOR[tp])
+        return colorize(name, TYPE_NAME_COLORS[src.type])
     elif tp == 'const':
         return str(src.output[0].value)
     elif tp in UNARY_OPS:
@@ -240,9 +248,13 @@ def expression_label_rec(src, dst, root, edges):
 
 def expression_label(v, edges):
     label = expression_label_rec(v, None, v, edges)
-    tp = v.type.name
-    if tp != 'reg' and (v.refer_by_name or tp == 'output'):
-        col = TYPE_TO_NAME_COLOR.get(tp, TYPE_TO_NAME_COLOR[None])
+    tp = v.type
+
+    if ((v.refer_by_name or tp == TYPES['output'])
+        and tp != TYPES['reg']
+        and not tp.is_module):
+
+        col = TYPE_NAME_COLORS.get(tp, DEFAULT_NAME_COLOR)
         var = colorize(v.name, col)
         label = f'{var} &larr; {label}'
     return f'<{label}>'
@@ -268,7 +280,7 @@ def owns_expression(v1):
         out_port = v1, pin_out
         for v2 in wire.destinations:
             pin_in_idx = v2.input.index(out_port)
-            # Not quite.
+            # Not quite. Wtf?
             if v2.type.name in {'if', 'reg'} and pin_in_idx != 0:
                 return True
     return False

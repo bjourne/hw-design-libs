@@ -18,7 +18,7 @@
         "not" : ["not_p"],
 
         // Timer
-        "timer" : ["timer"],
+        "timer" : ["tmr"],
 
         // Slices
         "slice" : [
@@ -55,14 +55,14 @@
         ]
     },
     "inputs" : {
-        "timeout_and_p" : ["timer.timeout", "p"],
+        "timeout_and_p" : ["tmr.timeout", "p"],
 
         "in_ready" : ["not_p"],
 
         "not_p" : ["p"],
 
         // Timer
-        "timer" : ["clk", "begin_p", "c7_8"],
+        "tmr" : ["clk", "begin_p", "c7_8"],
 
         // Arith
         "ac_ge_b1" : ["ac", "pad_b1"],
@@ -92,7 +92,7 @@
 
         // Muxes
         "next_p2" : ["begin_p", "c1_1", "next_p3"],
-        "next_p3" : ["timer.timeout", "c0_1", "p"],
+        "next_p3" : ["tmr.timeout", "c0_1", "p"],
         "next_b1" : ["begin_p", "b", "b1"],
 
         "next_acq" : ["begin_p", "cat_0a0", "next_acq2"],
@@ -112,7 +112,7 @@
     },
     "refer_by_name" : [
         "ac", "b1", "p", "q1",
-        "begin_p", "acq"
+        "begin_p", "acq", "tmr"
     ],
     "values" : {
         "c0_1" : 0,

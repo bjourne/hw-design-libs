@@ -22,24 +22,32 @@ def render_tmpl_to_file(tmpl_name, file_path, **kwargs):
 def render_lval(lval_tp, v):
     return f'{lval_tp} [{v.output[0].arity - 1}:0] {v.name}'
 
-def needs_width_specification(dst):
-    return dst.type == TYPES['cat']
+def arg_needs_width(dst):
+    tp = dst.type
+    return tp.is_module or tp == TYPES['cat']
 
-def render_rval_pred(src, pin, dst):
-    if (src.refer_by_name or src.type == TYPES['if']):
-        return src.name
+def input_wire_name(v, pin):
+    tp = v.type
+    if len(v.output) == 1 and not tp.is_module:
+        return v.name
+    return '%s_%s' % (v.name, tp.output[pin])
+
+def render_arg(src, pin, dst):
+    if (src.refer_by_name or
+        src.type in {TYPES['if'], TYPES['reg']} or
+        src.type.is_module):
+        return input_wire_name(src, pin)
     return render_rval(src, pin, dst)
 
 def render_rval(src, pin, dst):
     tp = src.type.name
 
-    args = tuple([render_rval_pred(v, pin, src) for v, pin in src.input])
+    args = tuple([render_arg(v, pin, src) for v, pin in src.input])
     sym = TYPE_SYMBOLS.get(tp)
 
     if src.type.is_module:
-        return input_wire_name(src, pin)
-
-    if tp in BINARY_OPS:
+        return ', '.join(args)
+    elif tp in BINARY_OPS:
         s = '%s %s %s' % (args[0], sym, args[1])
         return package_expr(src, dst) % s
     elif src.type == TYPES['cat']:
@@ -53,7 +61,7 @@ def render_rval(src, pin, dst):
         return src.name
     if tp == 'const':
         wire = src.output[0]
-        if needs_width_specification(dst):
+        if arg_needs_width(dst):
             return "%s'd%s" % (wire.arity, wire.value)
         return '%s' % wire.value
     elif tp == 'slice':
@@ -84,20 +92,16 @@ def output_name(v1, pin_idx):
     name = '%s_%s' % (v1.name, v1.type.output[pin_idx])
     return name, True, wire.arity
 
-def input_wire_name(v, pin):
-    tp = v.type
-    if len(v.output) == 1 and not tp.is_module:
-        return v.name
-    return '%s_%s' % (v.name, tp.output[pin])
-
 def render_submod_args(v):
+    # Hackish
+    input = render_rval(v, 0, None)
+
     output = [output_name(v, i) for i in range(len(v.output))]
     new_wires = [(n, a) for (n, new, a) in output if new]
-    output = [n for n, _, _ in output]
+    output = ', '.join(n for n, _, _ in output)
 
-
-    input = [input_wire_name(v2, pin)
-             for v2, pin in v.input]
+    if output:
+        input += ', '
     return input + output, new_wires
 
 def vertex_arity(v):
@@ -131,10 +135,10 @@ def partition_vertices(vertices):
             key = 'output'
         elif tp == TYPES['reg']:
             key = 'reg'
-        elif v.refer_by_name:
-            key = 'explicit'
         elif tp.is_module:
             key = 'submod'
+        elif v.refer_by_name:
+            key = 'explicit'
         elif tp == TYPES['if']:
             key = 'if'
         else:
@@ -178,6 +182,7 @@ def render_module(vertices, mod_name, path):
     regs_per_clk = groupby_sort(regs, lambda v: v.input[0][0].name)
 
     submods = partitions['submod']
+
     input = partitions['input']
     output = partitions['output']
     submod_names = sorted({v.type.name for v in submods if v.type.is_module})

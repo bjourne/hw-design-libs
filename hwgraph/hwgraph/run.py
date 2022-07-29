@@ -23,6 +23,13 @@ def vertex_get(vertices, name):
         raise ValueError(f'Missing vertex: {name}')
     return v
 
+def vertex_set(vertices, name, tp):
+    v = vertices.get(name)
+    if v:
+        fmt = 'Multiple types for vertex %s: %s, %s'
+        raise ValueError(fmt % (name, v.type.name, tp.name))
+    vertices[name] = Vertex(name, tp)
+
 def port_get(vertices, port):
     if '.' in port:
         name, out = port.split('.')
@@ -43,7 +50,7 @@ def load_circuit(path):
     for tp_name, ns in circuit['types'].items():
         tp = type_get(tp_name)
         for n in ns:
-            vertices[n] = Vertex(n, tp)
+            vertex_set(vertices, n, tp)
     for ar, ns in circuit['arities'].items():
         ar = int(ar)
         for n in ns:
