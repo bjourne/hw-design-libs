@@ -1,0 +1,51 @@
+// Controller for fixed-time algorithms
+{
+    "types" : {
+        "input" : [
+            "clk", "rstn", "cnt", "in_valid"
+        ],
+        "output" : [
+            "start", "in_ready", "out_valid"
+        ],
+        "reg" : ["p"],
+
+        "and" : [
+            "rstn_and_next",
+            "in_valid_and_in_ready",
+            "timeout_and_p"
+        ],
+        "not" : ["not_p"],
+
+        "if" : ["next1", "next2"],
+
+        "timer" : ["tmr"],
+
+        "const" : ["c0_1", "c1_1"]
+    },
+    "inputs" : {
+        "p" : ["clk", "rstn_and_next"],
+        "tmr" : ["clk", "start", "cnt"],
+        "in_ready" : ["not_p"],
+
+        "not_p" : ["p"],
+
+        "next1" : ["start", "c1_1", "next2"],
+        "next2" : ["tmr.timeout", "c0_1", "p"],
+
+        // And gates
+        "rstn_and_next" : ["rstn", "next1"],
+        "timeout_and_p" : ["tmr.timeout", "p"],
+        "in_valid_and_in_ready" : ["in_valid", "in_ready"],
+
+        // Output
+        "out_valid" : ["timeout_and_p"],
+        "start" : ["in_valid_and_in_ready"]
+    },
+    "values" : {
+        "c0_1" : 0,
+        "c1_1" : 1
+    },
+    "refer_by_name" : ["p", "tmr"],
+    "arities" : {
+    }
+}
