@@ -36,21 +36,6 @@ def port_get(vertices, port):
         raise ValueError(err % (v.name, tp.name, out))
     return v, tp.output.index(out)
 
-def load_types(path):
-    print(f'Loading types from {path}.')
-    d1 = load_json(path)
-    types = {}
-    for n, d2 in d1.items():
-        types[n] = Type(
-            n,
-            d2['input'],
-            d2['output'],
-            d2['constraints'],
-            d2.get('is_module') or False,
-            d2.get('optional_outputs') or False
-        )
-    return types
-
 def load_circuit(path):
     print(f'Loading circuit from {path}.')
     circuit = load_json(path)
@@ -107,8 +92,6 @@ def main():
     circuit_path, test_path = [Path(p) for p in argv[1:]]
     circuit_name = circuit_path.stem
 
-    #types = load_types(types_path)
-
     vertices = load_circuit(circuit_path)
 
     for v in vertices:
@@ -117,21 +100,17 @@ def main():
     infer_vertices(vertices)
 
     OUTPUT.mkdir(exist_ok = True)
-    #render_module(vertices, circuit_name, OUTPUT)
+    render_module(vertices, circuit_name, OUTPUT)
 
-    # tests = load_json(test_path)
-    # shuffle(tests)
-
-    # render_tb(types, vertices, tests, circuit_name, OUTPUT)
+    tests = load_json(test_path)
+    shuffle(tests)
+    render_tb(vertices, tests, circuit_name, OUTPUT)
 
     path = OUTPUT / f'{circuit_name}.png'
     plot_vertices(vertices, path,
                   False, False, True,
                   False, False)
-
     path = OUTPUT / f'{circuit_name}_statements.png'
     plot_expressions(vertices, path, False, True)
-
-
 
 main()

@@ -8,7 +8,7 @@ module {{ mod_name }} ({{ inouts|map(attribute='name')|join(', ')  }});
     // Registers
     {%- for clk, regs in regs_per_clk %}
     {%- for v in regs %}
-    reg [{{ v.arity - 1 }}:0] {{ v.name }};
+    reg [{{ v.output[0].arity - 1 }}:0] {{ v.name }};
     {%- endfor %}
     {%- endfor %}
     {%- for clk, regs in regs_per_clk %}

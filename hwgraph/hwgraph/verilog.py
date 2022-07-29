@@ -1,9 +1,11 @@
 # Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
+from collections import defaultdict
 from hwgraph import (BINARY_OPS,
-                     UNARY_OPS, TYPE_TO_SYMBOL,
+                     UNARY_OPS,
                      Vertex,
-                     package_vertex)
-from itertools import groupby
+                     package_expr)
+from hwgraph.types import TYPES, TYPE_SYMBOLS
+from hwgraph.utils import BASE_INDENT, flatten, groupby_sort
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, Template
 from more_itertools import partition
 from pathlib import Path
@@ -11,8 +13,6 @@ from pathlib import Path
 TMPL_PATH = Path(__file__).parent / 'templates'
 ENV = Environment(loader = FileSystemLoader(TMPL_PATH),
                   undefined = StrictUndefined)
-INDENT = ' ' * 4
-
 def render_tmpl_to_file(tmpl_name, file_path, **kwargs):
     tmpl = ENV.get_template(tmpl_name)
     txt = tmpl.render(**kwargs)
@@ -20,64 +20,54 @@ def render_tmpl_to_file(tmpl_name, file_path, **kwargs):
         of.write(txt + '\n')
 
 def render_lval(lval_tp, v):
-    return f'{lval_tp} [{v.arity - 1}:0] {v.name}'
+    return f'{lval_tp} [{v.output[0].arity - 1}:0] {v.name}'
 
-def render_rval_const(parent, child):
-    # Putting arity declarations on every constant is ugly so we only
-    # do it when it is (probably) necessary.
-    if (child.type.name in BINARY_OPS and
-        any(s.type.name == 'cat' for s in child.successors) or
-        child.type.name == 'cat'):
-        return "%s'd%s" % (parent.arity, parent.value)
-    return str(parent.value)
+def needs_width_specification(dst):
+    return dst.type == TYPES['cat']
 
-def render_rval(v1, parent):
-    def render_rval_pred(child, parent):
-        if (child.refer_by_name or
-            child.type.name == 'if' or
-            any(v2.type.name == 'slice' and
-                v2.predecessors.index(child) == 0
-                for v2 in child.successors)):
-            return child.name
-        return render_rval(child, parent)
-    tp = v1.type.name
-    sym = TYPE_TO_SYMBOL.get(tp)
+def render_rval_pred(src, dst):
+    if (src.refer_by_name or src.type == TYPES['if']):
+        return src.name
+    return render_rval(src, dst)
 
-    r_args = [render_rval_pred(v2, v1) for v2 in v1.predecessors]
-    r_args = tuple(r_args)
-    if tp == 'const':
-        return render_rval_const(v1, parent)
+def render_rval(src, dst):
+    tp = src.type.name
+
+    args = tuple([render_rval_pred(v, src) for v, _ in src.input])
+    sym = TYPE_SYMBOLS.get(tp)
+    if tp in BINARY_OPS:
+        s = '%s %s %s' % (args[0], sym, args[1])
+        return package_expr(src, dst) % s
+    elif tp == 'cat':
+        s = '%s, %s' % args
+        return package_expr(src, dst) % s
     elif tp == 'cast':
-        return "%s'(%s)" % r_args
+        return "%s'(%s)" % args
+    elif tp in UNARY_OPS:
+        return '%s%s' % (sym, args[0])
+    elif tp in {'input', 'reg'}:
+        return src.name
+    if tp == 'const':
+        wire = src.output[0]
+        if needs_width_specification(dst):
+            return "%s'd%s" % (wire.arity, wire.value)
+        return '%s' % wire.value
+    elif tp == 'slice':
+        return '%s[%s:%s]' % args
     elif tp == 'if':
         fmt = '%s ? %s : %s'
-        if max(len(a) for a in r_args) > 14:
+        if max(len(a) for a in args) > 14:
             fmt = '%s\n        ? %s\n        : %s'
-        return fmt % r_args
-    elif tp == 'cat':
-        s = '%s, %s' % r_args
-        return package_vertex(v1, parent) % s
-    elif tp == 'slice':
-        return '%s[%s:%s]' % r_args
-    elif tp in BINARY_OPS:
-        s = f'{r_args[0]} {sym} {r_args[1]}'
-        return package_vertex(v1, parent) % s
-    elif tp in UNARY_OPS:
-        return f'{sym}{r_args[0]}'
-    elif tp in {'input', 'reg'}:
-        return v1.name
+        return fmt % args
     elif tp == 'output':
-        return r_args[0]
-    assert False
+        return args[0]
+    else:
+        print(tp)
+        assert False
 
 ENV.globals.update(zip = zip,
                    render_rval = render_rval,
                    render_lval = render_lval)
-
-def groupby_sort(seq, keyfun):
-    grps = groupby(seq, keyfun)
-    grps = [(k, list(v)) for k, v in grps]
-    return sorted(grps)
 
 def output_name(v1, pin_idx):
     wire = v1.output[pin_idx]
@@ -114,56 +104,41 @@ def vertex_arity(v):
         return v.output[0].arity
     assert False
 
-def group_inputs_and_outputs(by_type, input_tp, output_tp):
-    input = by_type['input']
-    output = by_type['output']
-    gr_ins = groupby_sort(input, vertex_arity)
-    gr_outs = groupby_sort(output, vertex_arity)
-    io_groups = [(input_tp, gr_ins), (output_tp, gr_outs)]
-    return io_groups, input, output
+def group_inputs_and_outputs(partitions, input_tp, output_tp):
+    gr_ins = groupby_sort(partitions['input'], vertex_arity)
+    gr_outs = groupby_sort(partitions['output'], vertex_arity)
+    return [(input_tp, gr_ins), (output_tp, gr_outs)]
 
 def format_inouts(n, input, output):
     input = ', '.join(v.name for v in input)
     output = ', '.join(v.name for v in output)
     if input and output:
-        return input + ',\n' + n * INDENT + output
+        return input + ',\n' + ' ' * n * BASE_INDENT + output
     return input + output
 
-def render_module(vertices, mod_name, path):
+def is_type(v, tp):
+    return type_name(v) == tp
 
-    def is_type(v, tp):
-        return type_name(v) == tp
-
-    vs_by_type = dict(groupby_sort(vertices, type_name))
-    io_groups, input, output = \
-        group_inputs_and_outputs(vs_by_type, 'input', 'output')
-
-    # Group registers by driving clock.
-    regs = vs_by_type.get('reg', [])
-    regs_per_clk = groupby_sort(regs, lambda v: v.input[0][0].name)
-
-    others, regs = partition(lambda v: is_type(v, 'reg'), vertices)
-    others, explicit = partition(lambda v: v.refer_by_name, others)
-    others, implicit = partition(lambda v: is_type(v, 'if'), others)
-    others, submods = partition(lambda v: is_type(v, 'full_adder'), others)
-
-    submods = list(submods)
-
-    submod_names = sorted({v.type.name for v in submods
-                           if v.type.is_module})
-    submods = [(v, render_submod_args(v)) for v in submods]
-
-    kwargs = {
-        'mod_name' : mod_name,
-        'submod_names' : submod_names,
-        'inouts' : format_inouts(1, input, output),
-        'io_groups' : io_groups,
-        'submods' : submods
-    }
-    render_tmpl_to_file('module2.v', path / f'{mod_name}.v', **kwargs)
-
-def flatten(seq):
-    return [y for x in seq for y in x]
+def partition_vertices(vertices):
+    partitions = defaultdict(list)
+    for v in vertices:
+        tp = v.type
+        if tp == TYPES['input']:
+            key = 'input'
+        elif tp == TYPES['output']:
+            key = 'output'
+        elif tp == TYPES['reg']:
+            key = 'reg'
+        elif v.refer_by_name:
+            key = 'explicit'
+        elif tp.is_module:
+            key = 'submod'
+        elif tp == TYPES['if']:
+            key = 'if'
+        else:
+            key = 'other'
+        partitions[key].append(v)
+    return partitions
 
 def ansi_escape(s, tp, col):
     return '%%c[%d;%dm' % (tp, col) + s + '%c[0m'
@@ -190,16 +165,47 @@ def render_fmts(vs, ind):
     fmts = [ansi_escape(fmt, 1, col) for fmt, col in fmt_cols]
     return ' '.join(fmts)
 
-def render_tb(types, vertices, tests, mod_name, path):
-    vs_by_type = dict(groupby_sort(vertices, type_name))
-    io_groups, input, output = \
-        group_inputs_and_outputs(vs_by_type, 'reg', 'wire')
-    inouts_no_clk, inouts_clk = partition(lambda v: v.name == 'clk', input)
+def render_module(vertices, mod_name, path):
+    partitions = partition_vertices(vertices)
 
-    cycle = Vertex('cycle', types['const'])
+    io_groups = \
+        group_inputs_and_outputs(partitions, 'input', 'output')
+
+    # Group registers by driving clock.
+    regs = partitions['reg']
+    regs_per_clk = groupby_sort(regs, lambda v: v.input[0][0].name)
+
+    submods = partitions['submod']
+    input = partitions['input']
+    output = partitions['output']
+    submod_names = sorted({v.type.name for v in submods if v.type.is_module})
+    submods = [(v, render_module_args(v)) for v in submods]
+
+    kwargs = {
+        'mod_name' : mod_name,
+        'inouts' : format_inouts(1, input, output),
+        'io_groups' : io_groups,
+        'partitions' : partitions,
+        'regs_per_clk' : regs_per_clk,
+        'submod_names' : submod_names,
+        'submods' : submods
+    }
+    render_tmpl_to_file('module2.v', path / f'{mod_name}.v', **kwargs)
+
+def render_tb(vertices, tests, mod_name, path):
+    partitions = partition_vertices(vertices)
+    io_groups = \
+        group_inputs_and_outputs(partitions, 'reg', 'wire')
+
+    input = partitions['input']
+    output = partitions['output']
+
+    input_no_clk, input_clk = partition(lambda v: v.name == 'clk', input)
+
+    cycle = Vertex('cycle', TYPES['const'])
     cycle.value = 0
 
-    mon_verts = [cycle] + list(inouts_no_clk)
+    mon_verts = [cycle] + list(input_no_clk) + output
     disp_fmt = render_fmts(mon_verts, 's')
     disp_args = render_args(mon_verts, True)
     mon_fmt = render_fmts(mon_verts, None)
@@ -214,6 +220,6 @@ def render_tb(types, vertices, tests, mod_name, path):
         'disp_args' : disp_args,
         'mon_fmt' : mon_fmt,
         'mon_args' : mon_args,
-        'has_clk' : list(inouts_clk)
+        'has_clk' : len(list(input_clk)) > 0
     }
     render_tmpl_to_file('tb.v', path / f'{mod_name}_tb.v', **kw)

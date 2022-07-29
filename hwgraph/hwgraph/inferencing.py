@@ -1,13 +1,14 @@
 # Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
+#from hwgraph import BASE_INDENT
 from hwgraph.algebra import constrain
+from hwgraph.utils import long_value_error
 
 DEFAULT_INT_ARITY = 20
 
 def no_solution(vars, exprs):
-    vs = ['%s == %s' % (n, v) for n, v in vars.items() if v is not None]
-    fmt = 'No solution for system: %s'
-    err = fmt % ', '.join(vs + exprs)
-    raise ValueError(err)
+    lines = ['%s = %s' % nv for nv in vars.items() if nv[1] is not None]
+    lines.extend(exprs)
+    long_value_error('No solution for system:', lines)
 
 def infer_vertex(v):
     tp = v.type

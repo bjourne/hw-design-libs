@@ -45,20 +45,7 @@ BALANCED_BINARY_OPS = {
     'eq', 'sub', 'add'
 }
 
-TYPE_TO_SYMBOL = {
-    'and' : '&',
-    'xor' : '^',
-    'or' : '|',
-    'ge' : '>=',
-    'gt' : '>',
-    'eq' : '==',
-    'shl' : '<<',
-    'sub' : '-',
-    'add' : '+',
-    'not' : '!'
-}
-
-def package_vertex(parent, child):
+def package_expr(parent, child):
     parent_tp = parent.type.name
     child_tp = child and child.type.name
     if parent_tp in BINARY_OPS:

@@ -41,6 +41,7 @@ module {{ mod_name }}_tb();
     end endtask
     {% endfor %}
     initial begin
+        $display("== Running testbench {{ mod_name }} ==");
         $display("{{ disp_fmt }}", {{ disp_args }});
         $monitor("{{ mon_fmt }}", {{ mon_args }});
         {%- for tc in tests %}

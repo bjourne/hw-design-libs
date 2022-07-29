@@ -1,3 +1,4 @@
+# Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
 from hwgraph.utils import load_json
 from pathlib import Path
 
@@ -44,3 +45,19 @@ def load_types(path):
 if not TYPES_LOADED:
     TYPES = load_types(TYPES_PATH)
     TYPES_LOADED = True
+
+########################################################################
+# Registry of known types handled specially
+########################################################################
+TYPE_SYMBOLS = {
+    'and' : '&',
+    'xor' : '^',
+    'or' : '|',
+    'ge' : '>=',
+    'gt' : '>',
+    'eq' : '==',
+    'shl' : '<<',
+    'sub' : '-',
+    'add' : '+',
+    'not' : '!'
+}

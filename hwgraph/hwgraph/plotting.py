@@ -1,7 +1,7 @@
 # Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
 from html import escape
-from hwgraph import (UNARY_OPS, BINARY_OPS, TYPE_TO_SYMBOL, Vertex,
-                     package_vertex)
+from hwgraph import UNARY_OPS, BINARY_OPS, Vertex, package_expr
+from hwgraph.types import TYPE_SYMBOLS
 from pygraphviz import AGraph
 
 TYPE_TO_NAME_COLOR = {
@@ -53,7 +53,7 @@ def draw_label(v, draw_names):
     elif tp in {'input', 'output'}:
         label = colorize(n, tp_col)
     elif tp in UNARY_OPS | BINARY_OPS:
-        label = escape(TYPE_TO_SYMBOL.get(tp, ''))
+        label = escape(TYPE_SYMBOLS.get(tp, ''))
     else:
         assert False
     if v.refer_by_name and draw_names:
@@ -74,15 +74,14 @@ def style_node(v):
             'color' : 'black',
             'fillcolor' : fillcolor}
 
-def style_edge(v2, pin_in_idx, draw_arities, draw_pins):
+def style_edge(dst, wire, pin_in_idx, draw_arities, draw_pins):
     style = 'solid'
     penwidth = 0.5
 
-    wire = get_input_wire(v2, pin_in_idx)
     if wire.arity != 1:
         penwidth = 1.0
 
-    tp2 = v2.type
+    tp2 = dst.type
     tp2name = tp2.name
     color = 'black'
     if tp2name == 'if':
@@ -98,7 +97,7 @@ def style_edge(v2, pin_in_idx, draw_arities, draw_pins):
     if draw_arities:
         attrs['label'] = ' %s' % wire.arity
     if draw_pins:
-        if len(v2.input) > 1:
+        if len(dst.input) > 1:
             attrs['headlabel'] = pin_in
         if len(v1.output) > 1:
             attrs['taillabel'] = pin_out
@@ -168,7 +167,8 @@ def expression_input(src, dst, root, pin_in_idx, edges):
     src_tp = src.type.name
     col = TYPE_TO_NAME_COLOR.get(src_tp, TYPE_TO_NAME_COLOR[None])
     if dst_tp in {'reg', 'if'} and pin_in_idx != 0:
-        edges.add((src, root, pin_in_idx))
+        assert len(src.output) == 1
+        edges.add((src, root, src.output[0], pin_in_idx))
         return None
     elif src_tp == 'output':
         return colorize(src.name, col)
@@ -177,14 +177,15 @@ def expression_input(src, dst, root, pin_in_idx, edges):
         s = port_out_name(src, pin_out_idx)
         return colorize(s, col)
     elif src_tp in {'if', 'reg'} or src.type.is_module:
-        edges.add((src, root, pin_in_idx))
+        assert len(src.output) == 1
+        edges.add((src, root, src.output[0], pin_in_idx))
         return '*'
-    return expression_label_rec2(src, dst, root, edges)
+    return expression_label_rec(src, dst, root, edges)
 
-def expression_label_rec2(src, dst, root, edges):
+def expression_label_rec(src, dst, root, edges):
     tp = src.type.name
     name = src.name
-    sym = escape(TYPE_TO_SYMBOL.get(tp, ''))
+    sym = escape(TYPE_SYMBOLS.get(tp, ''))
 
     args = tuple([expression_input(v, src, root, pin_in_idx, edges)
                   for pin_in_idx, (v, _) in enumerate(src.input)])
@@ -192,13 +193,13 @@ def expression_label_rec2(src, dst, root, edges):
     if tp == 'output':
         return args[0]
     elif tp == 'slice':
-        return '[%s:%s]' % args[1:]
+        return '%s[%s:%s]' % args
     elif tp == 'cast':
         return "%s'(%s)" % args
     elif tp == 'if':
         return args[0]
     elif tp == 'full_adder':
-        return 'FA(%s)' % ', '.join(args)
+        return 'FA{%s}' % ', '.join(args)
     elif tp == 'reg':
         return expression_label_reg(src)
     elif tp == 'input':
@@ -209,16 +210,16 @@ def expression_label_rec2(src, dst, root, edges):
         return '%s%s' % (sym, args[0])
     elif tp in BINARY_OPS:
         s = '%s %s %s' % (args[0], sym, args[1])
-        return package_vertex(src, dst) % s
+        return package_expr(src, dst) % s
     elif tp == 'cat':
         s = '%s, %s' % args
-        return package_vertex(src, dst) % s
+        return package_expr(src, dst) % s
     else:
         print(tp)
         assert False
 
 def expression_label(v, edges):
-    label = expression_label_rec2(v, None, v, edges)
+    label = expression_label_rec(v, None, v, edges)
     tp = v.type.name
     if tp != 'reg' and (v.refer_by_name or tp == 'output'):
         col = TYPE_TO_NAME_COLOR.get(tp, TYPE_TO_NAME_COLOR[None])
@@ -252,6 +253,20 @@ def owns_expression(v1):
                 return True
     return False
 
+# Sometimes topological sort improves the layout. Sometimes it does
+# not.
+def bfs_order(vertices):
+    worklist = [v for v in vertices if len(v.input) == 0]
+    seen = set()
+    while worklist:
+        v = worklist.pop(0)
+        yield v
+        if v in seen:
+            continue
+        for wire in v.output:
+            worklist.extend(wire.destinations)
+        seen.add(v)
+
 def plot_vertices(vertices, png_path,
                   group_by_type, draw_clk, draw_names,
                   draw_arities, draw_pins):
@@ -274,12 +289,15 @@ def plot_vertices(vertices, png_path,
         g.add_node(v.name,
                    label = draw_label(v, draw_names),
                    **style_node(v))
-    for v2 in vertices:
-        for pin_in_idx, (v1, pin_out) in enumerate(v2.input):
-            if v1.name == 'clk' and not draw_clk:
+
+    for dst in vertices:
+        for pin_in_idx, (src, pin_out) in enumerate(dst.input):
+            if dst.name == 'clk' and not draw_clk:
                 continue
-            kw = style_edge(v2, pin_in_idx, draw_arities, draw_pins)
-            G.add_edge(v1.name, v2.name, **kw)
+            wire = src.output[pin_out]
+            kw = style_edge(dst, wire, pin_in_idx,
+                            draw_arities, draw_pins)
+            G.add_edge(src.name, dst.name, **kw)
     G.draw(png_path, prog='dot')
 
 def plot_expressions(vertices, png_path,
@@ -303,15 +321,13 @@ def plot_expressions(vertices, png_path,
             g = tp_graphs[tp]
         g.add_node(v.name, label = label, **style_node(v))
 
-    for v1, v2, pin_in_idx in edges:
-        kw = style_edge(v2, pin_in_idx, draw_arities, False)
-        assert v1 in vertices
-        assert v2 in vertices
-        G.add_edge(v1.name, v2.name, **kw)
+    for src, dst, wire, pin_in_idx in edges:
+        kw = style_edge(dst, wire, pin_in_idx, draw_arities, False)
+        G.add_edge(src.name, dst.name, **kw)
 
     # Create invisible eges between vertices lacking edges.
     trivial_exprs = set(vertices)
-    for v1, v2, pin_in_idx in edges:
+    for v1, v2, _, _ in edges:
         trivial_exprs -= {v1, v2}
 
     trivial_exprs = sorted(trivial_exprs,
