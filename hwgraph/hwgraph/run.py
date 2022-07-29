@@ -91,16 +91,13 @@ def check_vertex(v):
 def main():
     circuit_path, test_path = [Path(p) for p in argv[1:]]
     circuit_name = circuit_path.stem
-
     vertices = load_circuit(circuit_path)
 
     for v in vertices:
         check_vertex(v)
-
     infer_vertices(vertices)
 
     out_path = OUTPUT / circuit_name
-
     out_path.mkdir(exist_ok = True)
     render_module(vertices, circuit_name, out_path)
 
@@ -110,7 +107,7 @@ def main():
 
     path = out_path / f'physical.png'
     plot_vertices(vertices, path,
-                  True, False, True,
+                  False, False, True,
                   False, False)
     path = out_path / f'logical.png'
     plot_expressions(vertices, path, False, True)

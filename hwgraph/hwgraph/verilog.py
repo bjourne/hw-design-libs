@@ -57,7 +57,8 @@ def render_rval(src, dst):
     elif tp == 'if':
         fmt = '%s ? %s : %s'
         if max(len(a) for a in args) > 14:
-            fmt = '%s\n        ? %s\n        : %s'
+            s = '\n' + ' ' * BASE_INDENT * 2
+            fmt = s.join(['%s', '? %s', ': %s'])
         return fmt % args
     elif tp == 'output':
         return args[0]

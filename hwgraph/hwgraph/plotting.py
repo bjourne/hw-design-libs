@@ -45,11 +45,12 @@ def draw_label(v, draw_names):
     n = v.name
     tp = v.type.name
     tp_col = TYPE_TO_NAME_COLOR.get(tp, TYPE_TO_NAME_COLOR[None])
-    if tp in {'cast', 'cat', 'if', 'reg', 'slice'}:
+
+    if v.type.is_module:
+        label = n
+    elif tp in {'cast', 'cat', 'if', 'reg', 'slice'}:
         label = tp
-    elif tp in {'full_adder'}:
-        return n
-    elif tp == 'const':
+    elif v.type == TYPES['const']:
         value = v.output[0].value
         label = str(value)
     elif tp in {'input', 'output'}:
@@ -58,6 +59,7 @@ def draw_label(v, draw_names):
         label = escape(TYPE_SYMBOLS.get(tp, ''))
     else:
         assert False
+
     if v.refer_by_name and draw_names:
         var = colorize(n, tp_col)
         label = f'{var} &larr; {label}'
@@ -200,6 +202,8 @@ def expression_label_rec(src, dst, root, edges):
     args = tuple([expression_input(v, src, root, pin_in_idx, edges)
                   for pin_in_idx, (v, _) in enumerate(src.input)])
 
+    if src.type.is_module:
+        return '%s{%s}' % (src.name, ', '.join(args))
     if tp == 'output':
         return args[0]
     elif tp == 'slice':
@@ -208,8 +212,6 @@ def expression_label_rec(src, dst, root, edges):
         return "%s'(%s)" % args
     elif tp == 'if':
         return args[0]
-    elif tp == 'full_adder':
-        return 'FA{%s}' % ', '.join(args)
     elif tp == 'reg':
         return expression_label_reg(src)
     elif tp == 'input':
