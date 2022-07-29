@@ -99,18 +99,20 @@ def main():
 
     infer_vertices(vertices)
 
-    OUTPUT.mkdir(exist_ok = True)
-    render_module(vertices, circuit_name, OUTPUT)
+    out_path = OUTPUT / circuit_name
+
+    out_path.mkdir(exist_ok = True)
+    render_module(vertices, circuit_name, out_path)
 
     tests = load_json(test_path)
     shuffle(tests)
-    render_tb(vertices, tests, circuit_name, OUTPUT)
+    render_tb(vertices, tests, circuit_name, out_path)
 
-    path = OUTPUT / f'{circuit_name}.png'
+    path = out_path / f'physical.png'
     plot_vertices(vertices, path,
-                  False, False, True,
+                  True, False, True,
                   False, False)
-    path = OUTPUT / f'{circuit_name}_statements.png'
+    path = out_path / f'logical.png'
     plot_expressions(vertices, path, False, True)
 
 main()

@@ -1,4 +1,4 @@
-`include "{{ mod_name }}.v"
+`include "{{ mod_name }}/impl.v"
 module {{ mod_name }}_tb();
     // Cycle counter
     reg [15:0] cycle;

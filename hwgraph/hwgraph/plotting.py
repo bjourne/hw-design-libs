@@ -1,7 +1,7 @@
 # Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
 from html import escape
 from hwgraph import UNARY_OPS, BINARY_OPS, Vertex, package_expr
-from hwgraph.types import TYPE_SYMBOLS
+from hwgraph.types import TYPE_SYMBOLS, TYPES
 from pygraphviz import AGraph
 
 TYPE_TO_NAME_COLOR = {
@@ -28,9 +28,11 @@ TYPE_TO_SHAPE = {
     None : 'box'
 }
 TYPE_TO_FILLCOLOR = {
-    'reg' : '#ffffdd',
-    None : 'white'
+    TYPES['reg'] : '#ffffdd',
 }
+MODULE_FILLCOLOR = '#e0f0ff'
+DEFAULT_FILLCOLOR = 'white'
+
 TYPE_TO_SIZE = {
     'const' : 0.3,
     None : 0.55
@@ -65,9 +67,14 @@ def style_node(v):
     n, tp = v.name, v.type.name
 
     shape = TYPE_TO_SHAPE.get(tp, TYPE_TO_SHAPE[None])
-    fillcolor = TYPE_TO_FILLCOLOR.get(tp, TYPE_TO_FILLCOLOR[None])
-    width = height = TYPE_TO_SIZE.get(tp, TYPE_TO_SIZE[None])
 
+    if v.type in TYPE_TO_FILLCOLOR:
+        fillcolor = TYPE_TO_FILLCOLOR[v.type]
+    elif v.type.is_module:
+        fillcolor = MODULE_FILLCOLOR
+    else:
+        fillcolor = DEFAULT_FILLCOLOR
+    width = height = TYPE_TO_SIZE.get(tp, TYPE_TO_SIZE[None])
     return {'shape' : shape,
             'width' : width,
             'height' : height,
@@ -177,9 +184,12 @@ def expression_input(src, dst, root, pin_in_idx, edges):
         s = port_out_name(src, pin_out_idx)
         return colorize(s, col)
     elif src_tp in {'if', 'reg'} or src.type.is_module:
-        assert len(src.output) == 1
+        _, pin_out_idx = dst.input[pin_in_idx]
+        edges.add((src, root, src.output[pin_out_idx], pin_in_idx))
+        return '*'
         edges.add((src, root, src.output[0], pin_in_idx))
         return '*'
+
     return expression_label_rec(src, dst, root, edges)
 
 def expression_label_rec(src, dst, root, edges):
@@ -275,7 +285,8 @@ def plot_vertices(vertices, png_path,
     tp_graphs = {}
 
     # For gcd.json, sorting by type improves the layout a lot.
-    vertices = sorted(vertices, key = lambda v: v.type.name)
+    vertices = sorted(vertices,
+                      key = lambda v: v.type.name)
 
     for v in vertices:
         if v.name == 'clk' and not draw_clk:
@@ -292,7 +303,7 @@ def plot_vertices(vertices, png_path,
 
     for dst in vertices:
         for pin_in_idx, (src, pin_out) in enumerate(dst.input):
-            if dst.name == 'clk' and not draw_clk:
+            if src.name == 'clk' and not draw_clk:
                 continue
             wire = src.output[pin_out]
             kw = style_edge(dst, wire, pin_in_idx,

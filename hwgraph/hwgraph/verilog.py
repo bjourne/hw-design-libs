@@ -82,18 +82,17 @@ def output_name(v1, pin_idx):
 def input_wire_name(v1, pin):
     if v1.type.name == 'input':
         return v1.name
-    return '%s_%s' % (v1.name, pin)
+    return '%s_%s' % (v1.name, v1.type.output[pin])
 
 def render_submod_args(v):
     output = [output_name(v, i) for i in range(len(v.output))]
     new_wires = [(n, a) for (n, new, a) in output if new]
     output = [n for n, _, _ in output]
+
+
     input = [input_wire_name(v2, pin)
              for v2, pin in v.input]
     return input + output, new_wires
-
-def type_name(v):
-    return v.type.name
 
 def vertex_arity(v):
     tp = v.type.name
@@ -115,9 +114,6 @@ def format_inouts(n, input, output):
     if input and output:
         return input + ',\n' + ' ' * n * BASE_INDENT + output
     return input + output
-
-def is_type(v, tp):
-    return type_name(v) == tp
 
 def partition_vertices(vertices):
     partitions = defaultdict(list)
@@ -179,7 +175,14 @@ def render_module(vertices, mod_name, path):
     input = partitions['input']
     output = partitions['output']
     submod_names = sorted({v.type.name for v in submods if v.type.is_module})
-    submods = [(v, render_module_args(v)) for v in submods]
+
+    output_exprs = list(output)
+    for submod in submods:
+        for wire in submod.output:
+            for dst in wire.destinations:
+                if dst in output_exprs:
+                    output_exprs.remove(dst)
+    submods = [(v, render_submod_args(v)) for v in submods]
 
     kwargs = {
         'mod_name' : mod_name,
@@ -188,9 +191,10 @@ def render_module(vertices, mod_name, path):
         'partitions' : partitions,
         'regs_per_clk' : regs_per_clk,
         'submod_names' : submod_names,
-        'submods' : submods
+        'submods' : submods,
+        'output_exprs' : output_exprs
     }
-    render_tmpl_to_file('module2.v', path / f'{mod_name}.v', **kwargs)
+    render_tmpl_to_file('module2.v', path / 'impl.v', **kwargs)
 
 def render_tb(vertices, tests, mod_name, path):
     partitions = partition_vertices(vertices)
@@ -222,4 +226,4 @@ def render_tb(vertices, tests, mod_name, path):
         'mon_args' : mon_args,
         'has_clk' : len(list(input_clk)) > 0
     }
-    render_tmpl_to_file('tb.v', path / f'{mod_name}_tb.v', **kw)
+    render_tmpl_to_file('tb.v', path / 'tb.v', **kw)

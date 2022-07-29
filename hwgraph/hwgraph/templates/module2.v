@@ -1,6 +1,5 @@
-{%- for name in submod_names %}
-`include "{{ name }}.v"
-{%- endfor -%}
+{%- for name in submod_names %}`include "{{ name }}/impl.v"
+{%- endfor %}
 module {{ mod_name }} (
     {{ inouts }}
 );
@@ -10,6 +9,7 @@ module {{ mod_name }} (
     {%- endfor %}
     {%- endfor %}
 
+    {%- if regs_per_clk %}
     // Registers
     {%- for clk, regs in regs_per_clk %}
     {%- for v in regs %}
@@ -28,16 +28,21 @@ module {{ mod_name }} (
         {%- endfor %}
     end
     {%- endfor %}
+    {%- endif %}
 
+    {%- if partitions['explicit'] %}
     // Named wires
     {%- for v in partitions['explicit'] %}
     {{ render_lval('wire', v) }} = {{ render_rval(v, None) }};
     {%- endfor %}
+    {%- endif %}
 
+    {%- if partitions['if'] %}
     // Wires for ifs
     {%- for v in partitions['if'] %}
     {{ render_lval('wire', v) }} = {{ render_rval(v, None) }};
     {%- endfor %}
+    {%- endif %}
 
     {%- if submods %}
     // Wires between instances
@@ -55,8 +60,10 @@ module {{ mod_name }} (
     {%- endfor %}
     {%- endif %}
 
-    // Output wires
-    {%- for v in partitions['output'] %}
+    {%- if output_exprs %}
+    // Explicit output wires
+    {%- for v in output_exprs %}
     {{ render_lval('wire', v) }} = {{ render_rval(v, None) }};
     {%- endfor %}
+    {%- endif %}
 endmodule
