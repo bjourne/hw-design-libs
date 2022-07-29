@@ -20,17 +20,20 @@ IF_EDGE_ARROWHEAD_COLORS = {
     2 : '#aa0000'
 }
 
-TYPE_TO_SHAPE = {
-    'input' : 'oval',
-    'output' : 'oval',
-    'if' : 'diamond',
-    'reg' : 'record',
-    None : 'box'
+TYPE_SHAPES = {
+    TYPES['input'] : 'oval',
+    TYPES['output'] : 'oval',
+    TYPES['if'] : 'diamond',
+    TYPES['reg'] : 'record'
 }
+DEFAULT_SHAPE = 'box'
+MODULE_SHAPE = 'record'
+
 TYPE_TO_FILLCOLOR = {
     TYPES['reg'] : '#ffffdd',
 }
 MODULE_FILLCOLOR = '#e0f0ff'
+MODULE_SHAPE = 'record'
 DEFAULT_FILLCOLOR = 'white'
 
 TYPE_TO_SIZE = {
@@ -68,7 +71,12 @@ def draw_label(v, draw_names):
 def style_node(v):
     n, tp = v.name, v.type.name
 
-    shape = TYPE_TO_SHAPE.get(tp, TYPE_TO_SHAPE[None])
+    if v.type.is_module:
+        shape = MODULE_SHAPE
+    elif v.type in TYPE_SHAPES:
+        shape = TYPE_SHAPES[v.type]
+    else:
+        shape = DEFAULT_SHAPE
 
     if v.type in TYPE_TO_FILLCOLOR:
         fillcolor = TYPE_TO_FILLCOLOR[v.type]
@@ -145,7 +153,6 @@ def expression_label_reg(v):
     fmt = '%s &larr; [%d:%d]'
 
     arity = v.output[0].arity
-
     top = None
     if v.refer_by_name:
         top = fmt % (colorize(v.name, col), arity - 1, 0)
@@ -162,6 +169,9 @@ def expression_label_reg(v):
     if top:
         return '{ %s |{%s}}' % (top, slices) if slices else top
     return slices
+
+def expression_label_module(v, args):
+    return '{ %s |{%s}}' % (v.name, ', '.join(args))
 
 def port_out_name(v, out_pin):
     n = v.name
@@ -189,8 +199,6 @@ def expression_input(src, dst, root, pin_in_idx, edges):
         _, pin_out_idx = dst.input[pin_in_idx]
         edges.add((src, root, src.output[pin_out_idx], pin_in_idx))
         return '*'
-        edges.add((src, root, src.output[0], pin_in_idx))
-        return '*'
 
     return expression_label_rec(src, dst, root, edges)
 
@@ -203,8 +211,8 @@ def expression_label_rec(src, dst, root, edges):
                   for pin_in_idx, (v, _) in enumerate(src.input)])
 
     if src.type.is_module:
-        return '%s{%s}' % (src.name, ', '.join(args))
-    if tp == 'output':
+        return expression_label_module(src, args)
+    elif tp == 'output':
         return args[0]
     elif tp == 'slice':
         return '%s[%s:%s]' % args

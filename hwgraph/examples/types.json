@@ -27,6 +27,17 @@
             "co == 1"
         ]
     },
+    "timer" : {
+        "input" : ["clk", "set", "cnt"],
+        "output" : ["timeout"],
+        "is_module" : true,
+        "constraints" : [
+            "clk == 1",
+            "set == 1",
+            "cnt == 8",
+            "timeout == 1"
+        ]
+    },
     // Structural
     "cat" : {
         "input" : ["i1", "i2"],

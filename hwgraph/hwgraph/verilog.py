@@ -25,20 +25,24 @@ def render_lval(lval_tp, v):
 def needs_width_specification(dst):
     return dst.type == TYPES['cat']
 
-def render_rval_pred(src, dst):
+def render_rval_pred(src, pin, dst):
     if (src.refer_by_name or src.type == TYPES['if']):
         return src.name
-    return render_rval(src, dst)
+    return render_rval(src, pin, dst)
 
-def render_rval(src, dst):
+def render_rval(src, pin, dst):
     tp = src.type.name
 
-    args = tuple([render_rval_pred(v, src) for v, _ in src.input])
+    args = tuple([render_rval_pred(v, pin, src) for v, pin in src.input])
     sym = TYPE_SYMBOLS.get(tp)
+
+    if src.type.is_module:
+        return input_wire_name(src, pin)
+
     if tp in BINARY_OPS:
         s = '%s %s %s' % (args[0], sym, args[1])
         return package_expr(src, dst) % s
-    elif tp == 'cat':
+    elif src.type == TYPES['cat']:
         s = '%s, %s' % args
         return package_expr(src, dst) % s
     elif tp == 'cast':
@@ -80,10 +84,11 @@ def output_name(v1, pin_idx):
     name = '%s_%s' % (v1.name, v1.type.output[pin_idx])
     return name, True, wire.arity
 
-def input_wire_name(v1, pin):
-    if v1.type.name == 'input':
-        return v1.name
-    return '%s_%s' % (v1.name, v1.type.output[pin])
+def input_wire_name(v, pin):
+    tp = v.type
+    if len(v.output) == 1 and not tp.is_module:
+        return v.name
+    return '%s_%s' % (v.name, tp.output[pin])
 
 def render_submod_args(v):
     output = [output_name(v, i) for i in range(len(v.output))]

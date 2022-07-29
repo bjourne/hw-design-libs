@@ -23,7 +23,7 @@ module {{ mod_name }} (
         {%- if inp.type.name == 'if' %}
         {{ v.name }} <= {{ inp.name }};
         {%- else %}
-        {{ v.name }} <= {{ render_rval(inp, None) }};
+        {{ v.name }} <= {{ render_rval(inp, 0, None) }};
         {%- endif %}
         {%- endfor %}
     end
@@ -33,14 +33,14 @@ module {{ mod_name }} (
     {%- if partitions['explicit'] %}
     // Named wires
     {%- for v in partitions['explicit'] %}
-    {{ render_lval('wire', v) }} = {{ render_rval(v, None) }};
+    {{ render_lval('wire', v) }} = {{ render_rval(v, 0, None) }};
     {%- endfor %}
     {%- endif %}
 
     {%- if partitions['if'] %}
     // Wires for ifs
     {%- for v in partitions['if'] %}
-    {{ render_lval('wire', v) }} = {{ render_rval(v, None) }};
+    {{ render_lval('wire', v) }} = {{ render_rval(v, 0, None) }};
     {%- endfor %}
     {%- endif %}
 
@@ -63,7 +63,7 @@ module {{ mod_name }} (
     {%- if output_exprs %}
     // Explicit output wires
     {%- for v in output_exprs %}
-    {{ render_lval('wire', v) }} = {{ render_rval(v, None) }};
+    {{ render_lval('wire', v) }} = {{ render_rval(v, 0, None) }};
     {%- endfor %}
     {%- endif %}
 endmodule
