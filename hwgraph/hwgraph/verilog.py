@@ -195,7 +195,7 @@ def render_module(vertices, mod_name, path):
         'submods' : submods,
         'output_exprs' : output_exprs
     }
-    render_tmpl_to_file('module2.v', path / 'impl.v', **kwargs)
+    render_tmpl_to_file('module.v', path / 'impl.v', **kwargs)
 
 def render_tb(vertices, tests, mod_name, path):
     partitions = partition_vertices(vertices)
