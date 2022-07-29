@@ -39,7 +39,7 @@
         "input" : ["bits", "hi", "lo"],
         "output" : ["o"],
         "constraints" : [
-            "hi.value > lo.value",
+            "hi.value >= lo.value",
             "hi.value - lo.value + 1 == o"
         ]
     },

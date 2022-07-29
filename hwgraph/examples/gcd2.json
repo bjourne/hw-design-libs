@@ -1,6 +1,40 @@
 {
     // Same GCD except now we are squeezing all state into one register.
-    "predecessors" : {
+    "types" : {
+        "input" : ["clk", "rstn", "a", "b", "in_valid"],
+        "output" : ["o", "in_ready", "out_valid"],
+        "const" : ["c0_1", "c0_8", "c1_1", "c7_8", "c8_8", "c15_8", "c16_8"],
+
+        // Flip flops
+        "reg" : ["pxy"],
+
+        // Logic
+        "and" : ["begin_p", "y_eq_0_and_p"],
+        "not" : ["not_p", "not_rstn"],
+
+        // Muxes
+        "if" : ["next0", "next1", "next2", "next3"],
+
+        // Arith
+        "gt" : ["x_gt_y"],
+        "eq" : ["y_eq_0"],
+        "sub" : ["y_sub_x"],
+
+        // Concat
+        "cat" : [
+            "cat_00",
+            "cat_ab",
+            "cat_yx",
+            "cat_load", "cat_rstn", "cat_done",
+            "cat_p_x_gt_y",
+            "cat_x_y_sub_x",
+            "cat_p_x_y_sub_x"
+        ],
+
+        // Slices
+        "slice" : ["p", "x", "y"]
+    },
+    "inputs" : {
         // Slices
         "p" : ["pxy", "c16_8", "c16_8"],
         "x" : ["pxy", "c15_8", "c8_8"],
@@ -46,8 +80,8 @@
         "out_valid" : ["y_eq_0_and_p"]
     },
     "arities" : {
-        "1" : ["clk", "rstn", "in_valid", "in_ready", "out_valid"],
-        "8" : ["a", "b", "o"]
+        "1" : ["clk", "rstn", "in_valid"],
+        "8" : ["a", "b"]
     },
     "values" : {
         "c0_1" : 0,
@@ -58,39 +92,5 @@
         "c15_8" : 15,
         "c16_8" : 16
     },
-    "refer_by_name" : ["x", "y", "p"],
-    "types" : {
-        "input" : ["clk", "rstn", "a", "b", "in_valid"],
-        "output" : ["o", "in_ready", "out_valid"],
-        "const" : ["c0_1", "c0_8", "c1_1", "c7_8", "c8_8", "c15_8", "c16_8"],
-
-        // Flip flops
-        "reg" : ["pxy"],
-
-        // Logic
-        "and" : ["begin_p", "y_eq_0_and_p"],
-        "not" : ["not_p", "not_rstn"],
-
-        // Muxes
-        "if" : ["next0", "next1", "next2", "next3"],
-
-        // Arith
-        "gt" : ["x_gt_y"],
-        "eq" : ["y_eq_0"],
-        "sub" : ["y_sub_x"],
-
-        // Concat
-        "cat" : [
-            "cat_00",
-            "cat_ab",
-            "cat_yx",
-            "cat_load", "cat_rstn", "cat_done",
-            "cat_p_x_gt_y",
-            "cat_x_y_sub_x",
-            "cat_p_x_y_sub_x"
-        ],
-
-        // Slices
-        "slice" : ["p", "x", "y"]
-    }
+    "refer_by_name" : ["x", "y", "p"]
 }

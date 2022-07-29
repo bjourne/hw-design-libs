@@ -65,12 +65,8 @@
         "out_valid" : ["y_eq_0_and_p"]
     },
     "arities" : {
-        "1" : [
-            "clk.o", "rstn.o", "in_valid.o"
-        ],
-        "8" : [
-            "a.o", "b.o"
-        ]
+        "1" : ["clk.o", "rstn.o", "in_valid.o"],
+        "8" : ["a.o", "b.o"]
     },
     "values" : {
         "c0_1" : 0,
