@@ -90,10 +90,12 @@ def build(ctx):
     vhdl_lib_files = list(PATH_VHDL_LIB.glob('*.vhdl'))
     vhdl_tb_files = list(PATH_VHDL_TB.glob('*.vhdl'))
 
+    # Not sure how vhdl packages work.
     build_vhdl_lib(ctx, vhdl_lib_files, 'bjourne')
     if ctx.env['GHDL_OBJ_GEN']:
         build_vhdl_objs(ctx, vhdl_tb_files, 'bjourne')
         build_vhdl_tb(ctx, 'tb_ieee754', 'bjourne')
         build_vhdl_tb(ctx, 'tb_math', 'bjourne')
+        build_vhdl_tb(ctx, 'tb_parity', 'bjourne')
     else:
         build_vhdl_tbs_no_gen(ctx, vhdl_tb_files, 'bjourne')
