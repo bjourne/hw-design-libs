@@ -1,0 +1,66 @@
+// My interpretation of Gaisler's counter (page 45):
+// https://www.gaisler.com/doc/vhdl2proc.pdf
+//
+// This counter is a little weird because why are count, load, and zero
+// kept in registers?
+{
+    "types" : {
+        "input" : [
+            "clk",
+            "load",
+            "count",
+            "din"
+        ],
+        "output":  ["zero", "dout"],
+        "reg" : [
+            "r_load",
+            "r_count",
+            "r_zero",
+            "r_cval"
+        ],
+        "if" : [
+            "next_cval0", "next_cval1"
+        ],
+        "eq" : [
+            "next_cval0_eq_0"
+        ],
+        "add" : [
+            "cval_add_1"
+        ],
+        "const" : [
+            "c0_8",
+            "c1_8"
+        ]
+    },
+    "inputs" : {
+        "r_load" : ["clk", "load"],
+        "r_count" : ["clk", "count"],
+
+        "r_zero" : ["clk", "next_cval0_eq_0"],
+        "r_cval" : ["clk", "next_cval0"],
+
+
+        "next_cval1" : ["r_count", "cval_add_1", "r_cval"],
+        "next_cval0" : ["r_load", "din", "next_cval1"],
+
+        "next_cval0_eq_0" : ["next_cval0", "c0_8"],
+        "cval_add_1" : ["r_cval", "c1_8"],
+
+        "zero" : ["r_zero"],
+        "dout" : ["r_cval"]
+    },
+    "refer_by_name" : [
+        "r_zero",
+        "r_load",
+        "r_count",
+        "r_cval"
+    ],
+    "values" : {
+        "c0_8" : 0,
+        "c1_8" : 1
+    },
+    "arities" : {
+        "8" : ["r_cval"],
+        "1" : ["load"]
+    }
+}

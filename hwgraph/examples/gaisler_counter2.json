@@ -1,0 +1,74 @@
+{
+    "types" : {
+        "input" : [
+            "clk",
+            "load",
+            "count",
+            "din"
+        ],
+        "output":  ["zero", "dout"],
+        "reg" : [
+            "reg_state"
+        ],
+        "if" : [
+            "next_cval0", "next_cval1"
+        ],
+        "eq" : [
+            "next_cval0_eq_0"
+        ],
+        "add" : [
+            "cval_add_1"
+        ],
+        "const" : [
+            "c0_8",
+            "c1_8",
+            "c7_8",
+            "c8_8",
+            "c9_8",
+            "c10_8"
+        ],
+        "slice" : [
+            "r_cval", "r_zero", "r_count", "r_load"
+        ],
+        "cat" : [
+            "cat_load_count",
+            "cat_next_cval0_eq_0_next_cval0",
+            "next_state"
+        ]
+    },
+    "inputs" : {
+        "next_cval1" : ["r_count", "cval_add_1", "r_cval"],
+        "next_cval0" : ["r_load", "din", "next_cval1"],
+
+        "next_cval0_eq_0" : ["next_cval0", "c0_8"],
+
+        "cval_add_1" : ["r_cval", "c1_8"],
+
+        "r_cval" : ["reg_state", "c7_8", "c0_8"],
+        "r_zero" : ["reg_state", "c8_8", "c8_8"],
+        "r_count" : ["reg_state", "c9_8", "c9_8"],
+        "r_load" : ["reg_state", "c10_8", "c10_8"],
+
+        "zero" : ["r_zero"],
+        "dout" : ["r_cval"],
+
+        "cat_load_count" : ["load", "count"],
+        "cat_next_cval0_eq_0_next_cval0" : ["next_cval0_eq_0", "next_cval0"],
+        "next_state" : ["cat_load_count", "cat_next_cval0_eq_0_next_cval0"],
+
+        "reg_state" : ["clk", "next_state"]
+    },
+    "refer_by_name" : ["r_zero", "r_cval", "r_count", "r_load"],
+    "values" : {
+        "c0_8" : 0,
+        "c1_8" : 1,
+        "c7_8" : 7,
+        "c8_8" : 8,
+        "c9_8" : 9,
+        "c10_8" : 10
+    },
+    "arities" : {
+        "1" : ["clk", "load", "count"],
+        "8" : ["din"]
+    }
+}

@@ -195,6 +195,7 @@ def expression_input(src, dst, root, pin_in_idx, edges):
     dst_tp = dst.type.name
     src_tp = src.type.name
     col = TYPE_NAME_COLORS.get(src.type, DEFAULT_NAME_COLOR)
+    # This logic is getting incomprehensible.
     if dst_tp in {'reg', 'if'} and pin_in_idx != 0:
         assert len(src.output) == 1
         edges.add((src, root, src.output[0], pin_in_idx))
@@ -206,9 +207,11 @@ def expression_input(src, dst, root, pin_in_idx, edges):
         s = port_out_name(src, pin_out_idx)
         return colorize(s, col)
     elif src_tp in {'if', 'reg'} or src.type.is_module:
-        _, pin_out_idx = dst.input[pin_in_idx]
-        edges.add((src, root, src.output[pin_out_idx], pin_in_idx))
-        return '*'
+        if not (dst_tp == 'slice' and dst.refer_by_name):
+            _, pin_out_idx = dst.input[pin_in_idx]
+            edges.add((src, root, src.output[pin_out_idx], pin_in_idx))
+            return '*'
+        return 'name-only'
 
     return expression_label_rec(src, dst, root, edges)
 
@@ -219,6 +222,9 @@ def expression_label_rec(src, dst, root, edges):
 
     args = tuple([expression_input(v, src, root, pin_in_idx, edges)
                   for pin_in_idx, (v, _) in enumerate(src.input)])
+
+    if 'name-only' in args:
+        return args[0]
 
     if src.type.is_module:
         return expression_label_module(src, args)
@@ -251,8 +257,10 @@ def expression_label_rec(src, dst, root, edges):
 def expression_label(v, edges):
     label = expression_label_rec(v, None, v, edges)
     tp = v.type
-
-    if ((v.refer_by_name or tp == TYPES['output'])
+    if label == 'name-only':
+        col = TYPE_NAME_COLORS.get(tp, DEFAULT_NAME_COLOR)
+        label = colorize(v.name, col)
+    elif ((v.refer_by_name or tp == TYPES['output'])
         and tp != TYPES['reg']
         and not tp.is_module):
 
@@ -269,11 +277,7 @@ def owns_expression(v1):
     #   3) it has an output pin connected to a vertex that cannot
     #   "consume" it.
     tp = v1.type.name
-    if tp == 'slice':
-        return False
-    elif tp in {'reg', 'if', 'output'}:
-        return True
-    elif v1.refer_by_name:
+    if tp in {'reg', 'if', 'output'}:
         return True
     elif v1.type.is_module:
         return True
@@ -285,6 +289,8 @@ def owns_expression(v1):
             # Not quite. Wtf?
             if v2.type.name in {'if', 'reg'} and pin_in_idx != 0:
                 return True
+    if v1.refer_by_name and tp != 'slice':
+        return True
     return False
 
 # Sometimes topological sort improves the layout. Sometimes it does
