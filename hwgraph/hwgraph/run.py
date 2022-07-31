@@ -1,11 +1,6 @@
 # Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
 from collections import defaultdict
-from hwgraph import (
-    BINARY_OPS, BALANCED_BINARY_OPS,
-    UNARY_OPS,
-    Vertex,
-    connect_vertices)
-
+from hwgraph import Vertex, connect_vertices
 from hwgraph.inferencing import infer_vertices
 from hwgraph.plotting import plot_vertices, plot_expressions
 from hwgraph.types import type_get
@@ -115,7 +110,7 @@ def main():
     path = out_path / f'physical.png'
     plot_vertices(vertices, path,
                   False, False, True,
-                  False, False)
+                  True, True)
     path = out_path / f'logical.png'
     plot_expressions(vertices, path, False, True)
 

@@ -50,14 +50,17 @@ if not TYPES_LOADED:
 # Registry of known types handled specially
 ########################################################################
 TYPE_SYMBOLS = {
-    'and' : '&',
-    'xor' : '^',
-    'or' : '|',
-    'ge' : '>=',
-    'gt' : '>',
-    'eq' : '==',
-    'shl' : '<<',
-    'sub' : '-',
-    'add' : '+',
-    'not' : '!'
+    TYPES['and'] : '&',
+    TYPES['xor'] : '^',
+    TYPES['or'] : '|',
+    TYPES['ge'] : '>=',
+    TYPES['gt'] : '>',
+    TYPES['eq'] : '==',
+    TYPES['shl'] : '<<',
+    TYPES['sub'] : '-',
+    TYPES['add'] : '+',
+
+
+    TYPES['not'] : '!',
+    TYPES['reduce_xor'] : '^'
 }

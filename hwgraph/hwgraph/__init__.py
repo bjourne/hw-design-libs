@@ -34,16 +34,7 @@ BINARY_OPS = {
     'eq', 'sub', 'add'
 }
 # All ops with one input.
-UNARY_OPS = {'not'}
-
-# All ops with two inputs for which the arity of the lhs must match
-# the arity of the rhs.
-BALANCED_BINARY_OPS = {
-    'and', 'xor', 'or',
-    # TODO: Fix this (ge vs gt)
-    'ge', 'gt',
-    'eq', 'sub', 'add'
-}
+UNARY_OPS = {'not', 'reduce_xor'}
 
 def package_expr(parent, child):
     parent_tp = parent.type.name

@@ -1,0 +1,23 @@
+// Parity generator for 8bit numbers.
+{
+    "types" : {
+        "input" : [
+            "bits", "odd_even"
+        ],
+        "output" : [
+            "o"
+        ],
+        "cat" : ["cat_bits_odd_even"],
+        "reduce_xor" : ["xor_cat"]
+    },
+    "inputs" : {
+        "cat_bits_odd_even" : ["bits", "odd_even"],
+        "xor_cat" : ["cat_bits_odd_even"],
+        "o" : ["xor_cat"]
+    },
+    "refer_by_name" : [],
+    "arities" : {
+        "1" : ["odd_even"],
+        "8" : ["bits"]
+    }
+}

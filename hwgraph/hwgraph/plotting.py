@@ -62,7 +62,7 @@ def draw_label(v, draw_names):
     elif tp in {'input', 'output'}:
         label = colorize(n, col)
     elif tp in UNARY_OPS | BINARY_OPS:
-        label = escape(TYPE_SYMBOLS.get(tp, ''))
+        label = escape(TYPE_SYMBOLS[v.type])
     else:
         assert False
 
@@ -101,12 +101,11 @@ def style_edge(dst, wire, pin_in_idx, draw_arities, draw_pins):
     if wire.arity != 1:
         penwidth = 1.0
 
-    tp2 = dst.type
-    tp2name = tp2.name
+    dst_tp = dst.type
     color = 'black'
-    if tp2name == 'if':
+    if dst_tp == TYPES['if']:
         color = f'black;0.9999:%s' % IF_EDGE_ARROWHEAD_COLORS[pin_in_idx]
-    elif tp2name == 'reg' and pin_in_idx == 0:
+    elif dst_tp == TYPES['reg'] and pin_in_idx == 0:
         style = 'dashed'
 
     attrs = {
@@ -117,10 +116,13 @@ def style_edge(dst, wire, pin_in_idx, draw_arities, draw_pins):
     if draw_arities:
         attrs['label'] = ' %s' % wire.arity
     if draw_pins:
+        src, pin_out_idx = dst.input[pin_in_idx]
+        src_tp = src.type
         if len(dst.input) > 1:
-            attrs['headlabel'] = pin_in
-        if len(v1.output) > 1:
-            attrs['taillabel'] = pin_out
+            attrs['headlabel'] = dst_tp.input[pin_in_idx]
+        if len(src.output) > 1:
+            attrs['taillabel'] = src_tp.output[pin_out_idx]
+        attrs['labelfontcolor'] = '#ff00ff'
     return attrs
 
 def setup_graph():
@@ -213,7 +215,7 @@ def expression_input(src, dst, root, pin_in_idx, edges):
 def expression_label_rec(src, dst, root, edges):
     tp = src.type.name
     name = src.name
-    sym = escape(TYPE_SYMBOLS.get(tp, ''))
+    sym = escape(TYPE_SYMBOLS.get(src.type, ''))
 
     args = tuple([expression_input(v, src, root, pin_in_idx, edges)
                   for pin_in_idx, (v, _) in enumerate(src.input)])

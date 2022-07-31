@@ -130,12 +130,21 @@
             "i2 == o"
         ]
     },
+
     "or" : {
         "input": ["i1", "i2"],
         "output": ["o"],
         "constraints" : [
             "i1 == i2",
             "i2 == o"
+        ]
+    },
+    // Reducing logic
+    "reduce_xor" : {
+        "input" : ["i"],
+        "output" : ["o"],
+        "constraints" : [
+            "o == 1"
         ]
     },
     "sub" : {

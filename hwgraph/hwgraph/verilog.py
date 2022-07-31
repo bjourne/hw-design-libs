@@ -43,7 +43,7 @@ def render_rval(src, pin, dst):
     tp = src.type.name
 
     args = tuple([render_arg(v, pin, src) for v, pin in src.input])
-    sym = TYPE_SYMBOLS.get(tp)
+    sym = TYPE_SYMBOLS.get(src.type)
 
     if src.type.is_module:
         return ', '.join(args)

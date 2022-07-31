@@ -1,0 +1,11 @@
+[{
+    "name" : "Trivial test",
+    "exec" : [
+        ["set", {"bits" : 0, "odd_even" : 0}],
+        ["tick", 1],
+        ["assert", {"o" : 0}],
+        ["set", {"bits" : 254}],
+        ["tick", 1],
+        ["assert", {"o" : 1}]
+    ]
+}]
