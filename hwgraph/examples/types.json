@@ -205,7 +205,7 @@
         "output": ["o"],
         "constraints" : [
             "i1 == i2",
-            "o == i2"
+            "o == 2*i2"
         ]
     },
     "if" : {
