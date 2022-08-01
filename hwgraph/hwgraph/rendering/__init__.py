@@ -49,6 +49,6 @@ def package_expr(src, dst):
     if src_tp in TYPES_BINARY | TYPES_UNARY:
         if dst_tp in TYPES_BINARY | TYPES_UNARY:
             return '(%s)'
-    elif src_tp == 'cat' and dst_tp != 'cat':
+    elif src_tp == TYPES['cat'] and dst_tp != TYPES['cat']:
         return '{%s}'
     return '%s'

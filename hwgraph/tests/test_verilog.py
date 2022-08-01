@@ -1,8 +1,9 @@
 # Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
 from hwgraph import Vertex, connect_vertices
 from hwgraph.types import TYPES
-from hwgraph.verilog import (arg_needs_width,
-                             render_arg, render_lval, render_rval)
+from hwgraph.rendering import package_expr
+from hwgraph.rendering.verilog import (arg_needs_width,
+                                       render_arg, render_lval, render_rval)
 
 def const_with_value(val):
     v = Vertex('c', TYPES['const'])
@@ -37,3 +38,8 @@ def test_render_rval():
         wire.arity = i
         connect_vertices(c, 0, v)
     assert render_rval(v, 0, None) == "0'd0, 1'd1, 2'd2"
+
+def test_pack_cat():
+    src = Vertex('s', TYPES['cat'])
+    dst = Vertex('s', TYPES['if'])
+    assert package_expr(src, dst) == '{%s}'
