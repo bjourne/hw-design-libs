@@ -107,10 +107,10 @@ def main():
     shuffle(tests)
     render_tb(vertices, tests, circuit_name, out_path)
 
-    path = out_path / f'physical.png'
+    path = out_path / f'actual.png'
     plot_vertices(vertices, path,
                   False, False, True,
-                  True, True)
+                  True, False)
     path = out_path / f'logical.png'
     plot_expressions(vertices, path, False, True)
 
