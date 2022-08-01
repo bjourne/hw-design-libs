@@ -34,13 +34,13 @@ BINARY_OPS = {
     'eq', 'sub', 'add'
 }
 # All ops with one input.
-UNARY_OPS = {'not', 'reduce_xor'}
+UNARY_OPS = {'not', 'reduce_and', 'reduce_xor', 'reduce_or'}
 
 def package_expr(parent, child):
     parent_tp = parent.type.name
     child_tp = child and child.type.name
-    if parent_tp in BINARY_OPS:
-        if child_tp in BINARY_OPS:
+    if parent_tp in BINARY_OPS | UNARY_OPS:
+        if child_tp in BINARY_OPS | UNARY_OPS:
             return '(%s)'
     elif parent_tp == 'cat' and child_tp != 'cat':
         return '{%s}'

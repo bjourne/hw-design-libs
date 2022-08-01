@@ -56,7 +56,8 @@ def render_rval(src, pin, dst):
     elif tp == 'cast':
         return "%s'(%s)" % args
     elif tp in UNARY_OPS:
-        return '%s%s' % (sym, args[0])
+        s = '%s%s' % (sym, args[0])
+        return package_expr(src, dst) % s
     elif tp in {'input', 'reg'}:
         return src.name
     if tp == 'const':

@@ -62,5 +62,7 @@ TYPE_SYMBOLS = {
 
 
     TYPES['not'] : '!',
-    TYPES['reduce_xor'] : '^'
+    TYPES['reduce_xor'] : '^',
+    TYPES['reduce_and'] : '&',
+    TYPES['reduce_or'] : '|'
 }

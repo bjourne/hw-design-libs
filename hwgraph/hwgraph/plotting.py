@@ -243,7 +243,8 @@ def expression_label_rec(src, dst, root, edges):
     elif tp == 'const':
         return str(src.output[0].value)
     elif tp in UNARY_OPS:
-        return '%s%s' % (sym, args[0])
+        s = '%s%s' % (sym, args[0])
+        return package_expr(src, dst) % s
     elif tp in BINARY_OPS:
         s = '%s %s %s' % (args[0], sym, args[1])
         return package_expr(src, dst) % s
