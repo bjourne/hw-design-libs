@@ -2,10 +2,10 @@
 from collections import defaultdict
 from hwgraph import Vertex, connect_vertices
 from hwgraph.inferencing import infer_vertices
-from hwgraph.plotting import plot_vertices, plot_expressions
+from hwgraph.rendering.graphviz import plot_vertices, plot_expressions
+from hwgraph.rendering.verilog import render_module, render_tb
 from hwgraph.types import type_get
 from hwgraph.utils import load_json
-from hwgraph.verilog import render_module, render_tb
 from pathlib import Path
 from random import shuffle
 from sys import argv

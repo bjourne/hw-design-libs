@@ -133,7 +133,7 @@ def setup_graph():
         'ranksep' : 0.3,
         'fontname' : 'Inconsolata',
         'bgcolor' : 'transparent',
-        'rankdir' : 'LR'
+        'rankdir' : 'TB'
     }
     G.graph_attr.update(graph_attrs)
     node_attrs = {

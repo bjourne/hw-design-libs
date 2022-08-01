@@ -1,6 +1,4 @@
 # Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
-from collections import defaultdict
-
 class Wire:
     def __init__(self):
         self.arity = None
@@ -37,12 +35,12 @@ BINARY_OPS = {
 # All ops with one input.
 UNARY_OPS = {'not', 'reduce_and', 'reduce_xor', 'reduce_or'}
 
-def package_expr(parent, child):
-    parent_tp = parent.type.name
-    child_tp = child and child.type.name
-    if parent_tp in BINARY_OPS | UNARY_OPS:
-        if child_tp in BINARY_OPS | UNARY_OPS:
+def package_expr(src, dst):
+    src_tp = src.type.name
+    dst_tp = dst and dst.type.name
+    if src_tp in BINARY_OPS | UNARY_OPS:
+        if dst_tp in BINARY_OPS | UNARY_OPS:
             return '(%s)'
-    elif parent_tp == 'cat' and child_tp != 'cat':
+    elif src_tp == 'cat' and dst_tp != 'cat':
         return '{%s}'
     return '%s'
