@@ -1,21 +1,10 @@
 # Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
 from html import escape
-from hwgraph import UNARY_OPS, BINARY_OPS, Vertex, package_expr
-from hwgraph.types import TYPE_SYMBOLS, TYPES
+from hwgraph import Vertex
+from hwgraph.rendering import (TYPES_BINARY, TYPE_SYMBOLS, TYPES_UNARY,
+                               package_expr)
+from hwgraph.types import TYPES
 from pygraphviz import AGraph
-
-
-# Colors for referencing vertices.
-TYPE_NAME_COLORS = {
-    TYPES['output'] : '#bb77bb',
-    TYPES['input'] : '#cc8877',
-
-    # Slices and registers have the same color since they usually
-    # refer to the same data.
-    TYPES['reg'] : '#7788aa',
-    TYPES['slice'] : '#7788aa'
-}
-DEFAULT_NAME_COLOR = '#6ca471'
 
 IF_EDGE_ARROWHEAD_COLORS = {
     0 : 'black',
@@ -37,13 +26,25 @@ TYPE_TO_FILLCOLOR = {
     TYPES['reg'] : '#ffffdd',
 }
 MODULE_FILLCOLOR = '#e0f0ff'
-MODULE_SHAPE = 'record'
 DEFAULT_FILLCOLOR = 'white'
 
 TYPE_TO_SIZE = {
     'const' : 0.3,
     None : 0.55
 }
+
+# Font colors
+TYPE_NAME_COLORS = {
+    TYPES['output'] : '#bb77bb',
+    TYPES['input'] : '#cc8877',
+
+    # Slices and registers have the same color since they usually
+    # refer to the same data.
+    TYPES['reg'] : '#7788aa',
+    TYPES['slice'] : '#7788aa'
+}
+REFER_BY_NAME_COLOR = '#6ca471'
+DEFAULT_NAME_COLOR = 'black'
 
 def colorize(s, col):
     return '<font color="%s">%s</font>' % (col, s)
@@ -52,7 +53,7 @@ def draw_label(v, draw_names):
     n = v.name
     tp = v.type.name
 
-    col = TYPE_NAME_COLORS.get(v.type, DEFAULT_NAME_COLOR)
+    col = TYPE_NAME_COLORS.get(v.type, REFER_BY_NAME_COLOR)
     if v.type.is_module:
         label = tp
     elif tp in {'case', 'cast', 'cat', 'if', 'reg', 'slice'}:
@@ -62,7 +63,7 @@ def draw_label(v, draw_names):
         label = str(value)
     elif tp in {'input', 'output'}:
         label = colorize(n, col)
-    elif tp in UNARY_OPS | BINARY_OPS:
+    elif v.type in TYPES_UNARY | TYPES_BINARY:
         label = escape(TYPE_SYMBOLS[v.type])
     else:
         assert False
@@ -179,7 +180,7 @@ def expression_label_reg(v):
 def expression_label_module(v, args):
     top = v.type.name
     if v.refer_by_name:
-        var = colorize(v.name, DEFAULT_NAME_COLOR)
+        var = colorize(v.name, REFER_BY_NAME_COLOR)
         top = '%s &larr; %s' % (var, top)
     return '{ %s |{%s}}' % (top, ', '.join(args))
 
@@ -195,7 +196,7 @@ def port_out_name(v, out_pin):
 def expression_input(src, dst, root, pin_in_idx, edges):
     dst_tp = dst.type.name
     src_tp = src.type.name
-    col = TYPE_NAME_COLORS.get(src.type, DEFAULT_NAME_COLOR)
+    col = TYPE_NAME_COLORS.get(src.type, REFER_BY_NAME_COLOR)
     # This logic is getting incomprehensible.
     if dst_tp in {'reg', 'if', 'case'} and pin_in_idx != 0:
         assert len(src.output) == 1
@@ -245,10 +246,10 @@ def expression_label_rec(src, dst, root, edges):
         return colorize(name, TYPE_NAME_COLORS[src.type])
     elif tp == 'const':
         return str(src.output[0].value)
-    elif tp in UNARY_OPS:
+    elif src.type in TYPES_UNARY:
         s = '%s%s' % (sym, args[0])
         return package_expr(src, dst) % s
-    elif tp in BINARY_OPS:
+    elif src.type in TYPES_BINARY:
         s = '%s %s %s' % (args[0], sym, args[1])
         return package_expr(src, dst) % s
     elif tp == 'cat':
@@ -262,13 +263,13 @@ def expression_label(v, edges):
     label = expression_label_rec(v, None, v, edges)
     tp = v.type
     if label == 'name-only':
-        col = TYPE_NAME_COLORS.get(tp, DEFAULT_NAME_COLOR)
+        col = TYPE_NAME_COLORS.get(tp, REFER_BY_NAME_COLOR)
         label = colorize(v.name, col)
     elif ((v.refer_by_name or tp == TYPES['output'])
         and tp != TYPES['reg']
         and not tp.is_module):
 
-        col = TYPE_NAME_COLORS.get(tp, DEFAULT_NAME_COLOR)
+        col = TYPE_NAME_COLORS.get(tp, REFER_BY_NAME_COLOR)
         var = colorize(v.name, col)
         label = f'{var} &larr; {label}'
     return f'<{label}>'

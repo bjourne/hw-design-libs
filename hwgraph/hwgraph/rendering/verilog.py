@@ -1,10 +1,9 @@
 # Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
 from collections import defaultdict
-from hwgraph import (BINARY_OPS,
-                     UNARY_OPS,
-                     Vertex,
-                     package_expr)
-from hwgraph.types import TYPES, TYPE_SYMBOLS
+from hwgraph import Vertex
+from hwgraph.rendering import (TYPES_BINARY, TYPE_SYMBOLS, TYPES_UNARY,
+                               package_expr)
+from hwgraph.types import TYPES
 from hwgraph.utils import BASE_INDENT, flatten, groupby_sort
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, Template
 from more_itertools import partition
@@ -47,7 +46,7 @@ def render_rval(src, pin, dst):
 
     if src.type.is_module:
         return ', '.join(args)
-    elif tp in BINARY_OPS:
+    elif src.type in TYPES_BINARY:
         s = '%s %s %s' % (args[0], sym, args[1])
         return package_expr(src, dst) % s
     elif src.type == TYPES['cat']:
@@ -55,12 +54,12 @@ def render_rval(src, pin, dst):
         return package_expr(src, dst) % s
     elif tp == 'cast':
         return "%s'(%s)" % args
-    elif tp in UNARY_OPS:
+    elif src.type in TYPES_UNARY:
         s = '%s%s' % (sym, args[0])
         return package_expr(src, dst) % s
-    elif tp in {'input', 'reg'}:
+    elif src.type.name in {'input', 'reg'}:
         return src.name
-    if tp == 'const':
+    if src.type == TYPES['const']:
         wire = src.output[0]
         if arg_needs_width(dst):
             return "%s'd%s" % (wire.arity, wire.value)

@@ -23,24 +23,3 @@ class Vertex:
 def connect_vertices(src, pin_idx, dst):
     dst.input.append((src, pin_idx))
     src.output[pin_idx].destinations.append(dst)
-
-# All ops with two inputs.
-BINARY_OPS = {
-    'and', 'xor', 'or',
-    'ge', 'gt',
-    'le',
-    'shl',
-    'eq', 'sub', 'add', 'mul'
-}
-# All ops with one input.
-UNARY_OPS = {'not', 'reduce_and', 'reduce_xor', 'reduce_or'}
-
-def package_expr(src, dst):
-    src_tp = src.type.name
-    dst_tp = dst and dst.type.name
-    if src_tp in BINARY_OPS | UNARY_OPS:
-        if dst_tp in BINARY_OPS | UNARY_OPS:
-            return '(%s)'
-    elif src_tp == 'cat' and dst_tp != 'cat':
-        return '{%s}'
-    return '%s'

@@ -45,27 +45,3 @@ def load_types(path):
 if not TYPES_LOADED:
     TYPES = load_types(TYPES_PATH)
     TYPES_LOADED = True
-
-########################################################################
-# Registry of known types handled specially
-########################################################################
-TYPE_SYMBOLS = {
-    TYPES['and'] : '&',
-    TYPES['xor'] : '^',
-    TYPES['or'] : '|',
-    TYPES['ge'] : '>=',
-    TYPES['gt'] : '>',
-    TYPES['le'] : '<=',
-    TYPES['eq'] : '==',
-    TYPES['shl'] : '<<',
-
-    TYPES['sub'] : '-',
-    TYPES['add'] : '+',
-    TYPES['mul'] : '*',
-
-
-    TYPES['not'] : '!',
-    TYPES['reduce_xor'] : '^',
-    TYPES['reduce_and'] : '&',
-    TYPES['reduce_or'] : '|'
-}
