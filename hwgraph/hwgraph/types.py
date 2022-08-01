@@ -55,10 +55,13 @@ TYPE_SYMBOLS = {
     TYPES['or'] : '|',
     TYPES['ge'] : '>=',
     TYPES['gt'] : '>',
+    TYPES['le'] : '<=',
     TYPES['eq'] : '==',
     TYPES['shl'] : '<<',
+
     TYPES['sub'] : '-',
     TYPES['add'] : '+',
+    TYPES['mul'] : '*',
 
 
     TYPES['not'] : '!',

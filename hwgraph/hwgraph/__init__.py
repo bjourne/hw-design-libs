@@ -30,8 +30,9 @@ def connect_vertices(src, pin_idx, dst):
 BINARY_OPS = {
     'and', 'xor', 'or',
     'ge', 'gt',
+    'le',
     'shl',
-    'eq', 'sub', 'add'
+    'eq', 'sub', 'add', 'mul'
 }
 # All ops with one input.
 UNARY_OPS = {'not', 'reduce_and', 'reduce_xor', 'reduce_or'}

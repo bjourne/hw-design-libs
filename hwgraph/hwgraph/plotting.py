@@ -27,6 +27,7 @@ TYPE_SHAPES = {
     TYPES['input'] : 'oval',
     TYPES['output'] : 'oval',
     TYPES['if'] : 'diamond',
+    TYPES['case'] : 'diamond',
     TYPES['reg'] : 'record'
 }
 DEFAULT_SHAPE = 'box'
@@ -54,7 +55,7 @@ def draw_label(v, draw_names):
     col = TYPE_NAME_COLORS.get(v.type, DEFAULT_NAME_COLOR)
     if v.type.is_module:
         label = tp
-    elif tp in {'cast', 'cat', 'if', 'reg', 'slice'}:
+    elif tp in {'case', 'cast', 'cat', 'if', 'reg', 'slice'}:
         label = tp
     elif v.type == TYPES['const']:
         value = v.output[0].value
@@ -132,7 +133,7 @@ def setup_graph():
         'ranksep' : 0.3,
         'fontname' : 'Inconsolata',
         'bgcolor' : 'transparent',
-        'rankdir' : 'TB'
+        'rankdir' : 'LR'
     }
     G.graph_attr.update(graph_attrs)
     node_attrs = {
@@ -196,7 +197,7 @@ def expression_input(src, dst, root, pin_in_idx, edges):
     src_tp = src.type.name
     col = TYPE_NAME_COLORS.get(src.type, DEFAULT_NAME_COLOR)
     # This logic is getting incomprehensible.
-    if dst_tp in {'reg', 'if'} and pin_in_idx != 0:
+    if dst_tp in {'reg', 'if', 'case'} and pin_in_idx != 0:
         assert len(src.output) == 1
         edges.add((src, root, src.output[0], pin_in_idx))
         return None
@@ -206,7 +207,7 @@ def expression_input(src, dst, root, pin_in_idx, edges):
         _, pin_out_idx = dst.input[pin_in_idx]
         s = port_out_name(src, pin_out_idx)
         return colorize(s, col)
-    elif src_tp in {'if', 'reg'} or src.type.is_module:
+    elif src_tp in {'if', 'reg', 'case'} or src.type.is_module:
         if not (dst_tp == 'slice' and dst.refer_by_name):
             _, pin_out_idx = dst.input[pin_in_idx]
             edges.add((src, root, src.output[pin_out_idx], pin_in_idx))
@@ -235,6 +236,8 @@ def expression_label_rec(src, dst, root, edges):
     elif tp == 'cast':
         return "%s'(%s)" % args
     elif tp == 'if':
+        return args[0]
+    elif tp == 'case':
         return args[0]
     elif tp == 'reg':
         return expression_label_reg(src)
@@ -278,7 +281,7 @@ def owns_expression(v1):
     #   3) it has an output pin connected to a vertex that cannot
     #   "consume" it.
     tp = v1.type.name
-    if tp in {'reg', 'if', 'output'}:
+    if tp in {'reg', 'if', 'output', 'case'}:
         return True
     elif v1.type.is_module:
         return True
@@ -288,7 +291,7 @@ def owns_expression(v1):
         for v2 in wire.destinations:
             pin_in_idx = v2.input.index(out_port)
             # Not quite. Wtf?
-            if v2.type.name in {'if', 'reg'} and pin_in_idx != 0:
+            if v2.type.name in {'if', 'reg', 'case'} and pin_in_idx != 0:
                 return True
     if v1.refer_by_name and tp != 'slice':
         return True

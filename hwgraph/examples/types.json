@@ -16,6 +16,21 @@
         "constraints" : []
     },
     // Temporarily here
+    "case" : {
+        "input" : [
+            "c",
+            "i1", "i2", "i3", "i4",
+            "i5", "i6", "i7", "i8"
+        ],
+        "output" : ["o"],
+        "constraints" : [
+            "c == 2",
+            "i1 == i2",
+            "i2 == i3",
+            "i3 == i4",
+            "i4 == o"
+        ]
+    },
     "pctrl" : {
         "input" : ["clk", "rstn", "cnt", "in_valid"],
         "output" : ["start", "in_ready", "out_valid"],
@@ -91,6 +106,14 @@
             "i1 == i2"
         ]
     },
+    "le" : {
+        "input": ["i1", "i2"],
+        "output": ["o"],
+        "constraints" : [
+            "o == 1",
+            "i1 == i2"
+        ]
+    },
     "gt" : {
         "input": ["i1", "i2"],
         "output": ["o"],
@@ -147,6 +170,20 @@
             "o == 1"
         ]
     },
+    "reduce_and" : {
+        "input" : ["i"],
+        "output" : ["o"],
+        "constraints" : [
+            "o == 1"
+        ]
+    },
+    "reduce_or" : {
+        "input" : ["i"],
+        "output" : ["o"],
+        "constraints" : [
+            "o == 1"
+        ]
+    },
     "sub" : {
         "input": ["i1", "i2"],
         "output": ["o"],
@@ -161,6 +198,14 @@
         "constraints" : [
             "i1 == i2",
             "i2 == o"
+        ]
+    },
+    "mul" : {
+        "input": ["i1", "i2"],
+        "output": ["o"],
+        "constraints" : [
+            "i1 == i2",
+            "o == i2"
         ]
     },
     "if" : {
