@@ -38,7 +38,7 @@ architecture rtl of systolic is
     -- These buffers could be a problem for large Ns. :)
     signal buf : buffer_t;
 
-    procedure report_systolic is
+    procedure debug_systolic is
         variable fstatus : file_open_status;
         variable file_line : line;
         file fptr : text;
@@ -61,7 +61,7 @@ architecture rtl of systolic is
         for r in 0 to LAST loop
             write(file_line, r, right, 3);
             for c in 0 to LAST loop
-                write(file_line, SE(r, c), right, 4);
+                write(file_line, SE(r, c), right, 5);
             end loop;
             writeline(output, file_line);
         end loop;
@@ -150,7 +150,7 @@ begin
         end if;
         if rising_edge(clk) then
             if p then
-                report_systolic;
+                --debug_systolic;
             end if;
             if rstn = '0' then
                 for r in 0 to LAST loop
