@@ -119,85 +119,8 @@ begin
         end loop;
         feed_data(next_cnt rem N, a_row, b_col, E, S);
 
-        -- Should be a case in the future.
-        if next_cnt = LAST then
-            for i in 0 to -1 loop
-                c_row(i) <= buf(i, -1 - i);
-            end loop;
-            for i in 0 to N - 1 loop
-                c_row(i) <= SE(LAST - i, LAST);
-            end loop;
-            -- Buffer c21, c31, ..., cN1
-            for i in 0 to N - 2 loop
-                buf(0, i) <= SE(LAST, LAST - 1 - i);
-            end loop;
-        elsif next_cnt = LAST + 1 then
-            -- Buffered elements
-            for i in 0 to 0 loop
-                c_row(i) <= buf(i, 0 - i);
-            end loop;
-            -- Output c22, c23, ..., c2N
-            for i in 1 to N - 1 loop
-                c_row(i) <= SE(LAST - i + 1, LAST);
-            end loop;
-            -- Buffer c32, c42, ...
-            for i in 0 to N - 3 loop
-                buf(1, i) <= SE(LAST, LAST - 1 - i);
-            end loop;
-        elsif next_cnt = LAST + 2 then
-            -- Output c31, c32
-            for i in 0 to 1 loop
-                c_row(i) <= buf(i, 1 - i);
-            end loop;
-            -- Output c33, c34
-            for i in 2 to N - 1 loop
-                c_row(i) <= SE(LAST - i + 2, LAST);
-            end loop;
-            -- Buffer c43, c53, ...
-            for i in 0 to N - 4 loop
-                buf(2, i) <= SE(LAST, LAST - 1 - i);
-            end loop;
-        elsif next_cnt = LAST + 3 then
-            -- Output c41, c42, c43
-            for i in 0 to 2 loop
-                c_row(i) <= buf(i, 2 - i);
-            end loop;
-            -- Output c44
-            for i in 3 to N - 1 loop
-                c_row(i) <= SE(LAST - i + 3, LAST);
-            end loop;
-            -- Buffer c54, c64, ...
-            for i in 0 to N - 5 loop
-                buf(3, i) <= SE(LAST, LAST - 1 - i);
-            end loop;
-        elsif next_cnt = LAST + 4 then
-            -- Output buffered elements
-            for i in 0 to 3 loop
-                c_row(i) <= buf(i, 3 - i);
-            end loop;
-            -- Output c55
-            for i in 4 to N - 1 loop
-                c_row(i) <= SE(LAST - i + 4, LAST);
-            end loop;
-            -- Bufferr c65, c75
-            for i in 0 to N - 6 loop
-                buf(4, i) <= SE(LAST, LAST - 1 - i);
-            end loop;
-        elsif next_cnt = LAST + 5 then
-            -- Output buffered elements
-            for i in 0 to 4 loop
-                c_row(i) <= buf(i, 4 - i);
-            end loop;
-            -- Output c66
-            for i in 5 to N - 1 loop
-                c_row(i) <= SE(LAST - i + 5, LAST);
-            end loop;
-            -- Buffer
-            for i in 0 to N - 7 loop
-                buf(5, i) <= SE(LAST, LAST - 1 - i);
-            end loop;
-        else
-            -- Default things, to avoid latches being inferred.
+        -- Defaults
+        if next_cnt < LAST then
             for i in 0 to N - 1 loop
                 c_row(i) <= 0;
             end loop;
@@ -206,8 +129,25 @@ begin
                     buf(i, j) <= 0;
                 end loop;
             end loop;
+        else
+            -- r is row to emit
+            for r in 0 to N - 1 loop
+                if next_cnt = LAST + r then
+                    -- Buffered elements
+                    for i in 0 to -1 + r loop
+                        c_row(i) <= buf(i, -1 + r - i);
+                    end loop;
+                    -- Output edges elements
+                    for i in r to N - 1 loop
+                        c_row(i) <= SE(LAST - i + r, LAST);
+                    end loop;
+                    -- Buffer a row
+                    for i in 0 to N - 2 - r loop
+                        buf(r, i) <= SE(LAST, LAST - 1 - i);
+                    end loop;
+                end if;
+            end loop;
         end if;
-
         if rising_edge(clk) then
             if p then
                 report_systolic;

@@ -1,22 +1,3 @@
--- [[14  5  3  9 11 17]
---  [18  9  8 18  3 17]
---  [11  0 10 17  5 12]
---  [19 16  2 19  2 19]
---  [19 14 15 18  6 10]
---  [13 19 19  2  2 19]]
--- [[18  7 13 14  4  5]
---  [ 1 15 14 19 12 10]
---  [ 7 13 18  0  2  3]
---  [13 13  1 18 16 13]
---  [ 0  6  9  5 13 10]
---  [15 19 13 13 16  7]]
--- [[ 650  718  635  729  681  475]
---  [ 878  940  770  983  795  587]
---  [ 669  686  541  641  593  440]
---  [ 904 1019  791 1169  906  661]
---  [ 845  998  915 1016  800  644]
---  [ 697 1022 1044  836  680  491]]
-
 -- Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
 library bjourne;
 library ieee;
@@ -42,6 +23,8 @@ architecture beh of tb_systolic is
     signal in_valid6, in_ready6 : std_logic;
     signal a_row6, b_col6, c_row6 : integer_vector(0 to 5);
 
+    signal in_valid7, in_ready7 : std_logic;
+    signal a_row7, b_col7, c_row7 : integer_vector(0 to 6);
 
     procedure tick(signal c : inout std_logic) is
     begin
@@ -62,6 +45,101 @@ architecture beh of tb_systolic is
         rstn0 <= '1';
         tick(clk0);
     end;
+
+    procedure test7x7(signal clk0 : inout std_logic;
+                      signal in_valid : inout std_logic;
+                      signal in_ready : in std_logic;
+                      signal a_row : out integer_vector(0 to 6);
+                      signal b_col : out integer_vector(0 to 6);
+                      signal c_row : in integer_vector(0 to 6)) is
+    begin
+        assert in_ready = '1';
+        in_valid <= '1';
+
+        -- Tick 0
+        a_row <= (10, 0, 12, 17, 9, 19, 12);
+        b_col <= (16, 9, 15, 19, 19, 8, 19);
+        tick(clk0);
+
+        -- Tick 1
+        a_row <= (15, 17, 2, 0,  7,  1,  3);
+        b_col <= ( 6, 18, 9, 5, 12, 17, 10);
+        tick(clk0);
+
+        -- Tick 2
+        a_row <= (9, 19, 15, 11, 15, 16, 13);
+        b_col <= (16, 17, 11, 12, 5, 0, 11);
+        tick(clk0);
+
+        -- Tick 3
+        a_row <= (7, 6, 19, 0, 11, 19, 14);
+        b_col <= (0, 16, 19, 1, 2, 5, 17);
+        tick(clk0);
+
+        -- Tick 4
+        a_row <= (5, 4, 19, 0, 2, 1, 9);
+        b_col <= (9, 13, 18, 5, 1, 12, 1);
+        tick(clk0);
+
+        -- Tick 5
+        a_row <= (6, 2, 14, 8, 10, 16, 8);
+        b_col <= (0, 15, 17, 7, 19, 13, 4);
+        tick(clk0);
+
+        -- Tick 6
+        a_row <= (12, 7, 2, 14, 19, 19, 1);
+        b_col <= (2, 2, 0, 0, 3, 19, 16);
+        tick(clk0);
+
+        -- Tick 7
+        tick(clk0);
+
+        -- Tick 8
+        tick(clk0);
+
+        -- Tick 9
+        tick(clk0);
+
+        -- Tick 10
+        tick(clk0);
+
+        -- Tick 11
+        tick(clk0);
+
+        -- Tick 12
+        tick(clk0);
+
+        -- Tick 13
+        assert c_row = (1214, 804, 673, 562, 640, 789, 600);
+        tick(clk0);
+
+        -- Tick 14
+        assert c_row = (621, 545, 619, 380, 414, 447, 152);
+        tick(clk0);
+
+        -- Tick 15
+        assert c_row = (1409, 1168, 982, 931, 873, 1162, 613);
+        tick(clk0);
+
+        -- Tick 16
+        assert c_row = (1078, 916, 632, 812, 736, 925, 644);
+        tick(clk0);
+
+        -- Tick 17
+        assert c_row = (618, 404, 466, 587, 462, 470, 187);
+        tick(clk0);
+
+        -- Tick 18
+        assert c_row = (946, 710, 518, 542, 582, 754, 478);
+        tick(clk0);
+
+        -- Tick 18
+        assert c_row = (1083, 847, 607, 314, 553, 849, 472);
+        tick(clk0);
+
+        assert in_ready = '1';
+
+    end procedure;
 
     procedure test6x6(signal clk0 : inout std_logic;
                       signal in_valid : inout std_logic;
@@ -377,22 +455,38 @@ begin
             b_col => b_col6,
             c_row => c_row6
         );
+    systolic7: entity systolic
+        generic map(
+            N => 7
+        )
+        port map (
+            clk => clk,
+            rstn => rstn,
+            in_valid => in_valid7,
+            in_ready => in_ready7,
+            a_row => a_row7,
+            b_col => b_col7,
+            c_row => c_row7
+        );
     process
     begin
-        a_row3 <= (-1, -1, -1);
-        b_col3 <= (-1, -1, -1);
-        a_row4 <= (-1, -1, -1, -1);
-        b_col4 <= (-1, -1, -1, -1);
-        a_row5 <= (-1, -1, -1, -1, -1);
-        b_col5 <= (-1, -1, -1, -1, -1);
+        a_row3 <= (others => -1);
+        b_col3 <= (others => -1);
+        a_row4 <= (others => -1);
+        b_col4 <= (others => -1);
+        a_row5 <= (others => -1);
+        b_col5 <= (others => -1);
         a_row6 <= (others => -1);
         b_col6 <= (others => -1);
+        a_row7 <= (others => -1);
+        b_col7 <= (others => -1);
         reset(clk, rstn);
 
         test3x3(clk, in_valid3, in_ready3, a_row3, b_col3, c_row3);
         test4x4(clk, in_valid4, in_ready4, a_row4, b_col4, c_row4);
         test5x5(clk, in_valid5, in_ready5, a_row5, b_col5, c_row5);
         test6x6(clk, in_valid6, in_ready6, a_row6, b_col6, c_row6);
+        test7x7(clk, in_valid7, in_ready7, a_row7, b_col7, c_row7);
 
         assert false report "all tests passed" severity note;
         wait;
