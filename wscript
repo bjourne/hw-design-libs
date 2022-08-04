@@ -21,17 +21,11 @@ PATH_VHDL = Path('vhdl')
 PATH_VHDL_TB = PATH_VHDL / 'tb'
 PATH_VHDL_LIB = PATH_VHDL / 'lib'
 
-def build_verilog_module(ctx, name, sources = None):
+def build_verilog_module(ctx, name):
     target = Path('iverilog') / name
-
-
     tb_src = PATH_VERILOG_TB / (name + '.sv')
-    lib_src = [PATH_VERILOG_LIB / (name + '.sv')]
-    if sources:
-        lib_src = [PATH_VERILOG_LIB / (source + '.sv') for source in sources]
-    source = [tb_src] + lib_src
-    # source = [PATH_VERILOG_TB / (name + '.sv'),
-    #           PATH_VERILOG_LIB / (name + '.sv')]
+    lib_src = PATH_VERILOG_LIB / (name + '.sv')
+    source = [tb_src, lib_src]
     ctx(target = str(target),
         source = [str(s) for s in source],
         rule = '${IVERILOG} -g2012 -I ../verilog/lib ${SRC[0]} -o ${TGT}')
@@ -92,7 +86,7 @@ def build(ctx):
     build_verilog_module(ctx, 'full_adder')
     build_verilog_module(ctx, 'adder')
     build_verilog_module(ctx, 'alu')
-    build_verilog_module(ctx, 'syst_array') #, ['syst_array', 'syst_pe'])
+    build_verilog_module(ctx, 'syst_array')
     build_verilator_tb(ctx, 'matmul')
 
     # GHDL stuff
@@ -106,5 +100,6 @@ def build(ctx):
         build_vhdl_tb(ctx, 'tb_ieee754', 'bjourne')
         build_vhdl_tb(ctx, 'tb_math', 'bjourne')
         build_vhdl_tb(ctx, 'tb_parity', 'bjourne')
+        build_vhdl_tb(ctx, 'tb_systolic', 'bjourne')
     else:
         build_vhdl_tbs_no_gen(ctx, vhdl_tb_files, 'bjourne')
