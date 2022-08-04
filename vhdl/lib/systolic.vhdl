@@ -36,12 +36,6 @@ architecture rtl of systolic is
     signal SE : south_east_t;
 
     -- These buffers could be a problem for large Ns. :)
-    --signal buf_col1 : integer_vector(0 to N - 2);
-    --signal buf_col3 : integer_vector(0 to N - 4);
-    --signal buf_col4 : integer_vector(0 to N - 5);
-    -- signal buf_col5 : integer_vector(0 to N - 6);
-    -- signal buf_col6 : integer_vector(0 to N - 7);
-
     signal buf : buffer_t;
 
     procedure report_systolic is
@@ -189,6 +183,19 @@ begin
             for i in 0 to N - 6 loop
                 buf(4, i) <= SE(LAST, LAST - 1 - i);
             end loop;
+        elsif next_cnt = LAST + 5 then
+            -- Output buffered elements
+            for i in 0 to 4 loop
+                c_row(i) <= buf(i, 4 - i);
+            end loop;
+            -- Output c66
+            for i in 5 to N - 1 loop
+                c_row(i) <= SE(LAST - i + 5, LAST);
+            end loop;
+            -- Buffer
+            for i in 0 to N - 7 loop
+                buf(5, i) <= SE(LAST, LAST - 1 - i);
+            end loop;
         else
             -- Default things, to avoid latches being inferred.
             for i in 0 to N - 1 loop
@@ -203,7 +210,7 @@ begin
 
         if rising_edge(clk) then
             if p then
-                --report_systolic;
+                report_systolic;
             end if;
             if rstn = '0' then
                 for r in 0 to LAST loop
