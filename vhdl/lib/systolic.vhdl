@@ -26,6 +26,7 @@ architecture rtl of systolic is
     type east_t is array(0 to LAST - 1, 0 to LAST) of integer;
     type south_t is array(0 to LAST, 0 to LAST - 1) of integer;
     type south_east_t is array(0 to LAST, 0 to LAST) of integer;
+    type  buffer_t is array(0 to N, 0 to N - 2) of integer;
 
     signal cnt : natural;
     signal p : std_logic;
@@ -34,11 +35,14 @@ architecture rtl of systolic is
     signal S : south_t;
     signal SE : south_east_t;
 
-    -- Less random buffers
-    signal buf_col1 : integer_vector(0 to N - 2);
-    signal buf_col2 : integer_vector(0 to N - 3);
-    signal buf_col3 : integer_vector(0 to N - 4);
-    signal buf_col4 : integer_vector(0 to N - 5);
+    -- These buffers could be a problem for large Ns. :)
+    --signal buf_col1 : integer_vector(0 to N - 2);
+    --signal buf_col3 : integer_vector(0 to N - 4);
+    --signal buf_col4 : integer_vector(0 to N - 5);
+    -- signal buf_col5 : integer_vector(0 to N - 6);
+    -- signal buf_col6 : integer_vector(0 to N - 7);
+
+    signal buf : buffer_t;
 
     procedure report_systolic is
         variable fstatus : file_open_status;
@@ -106,7 +110,7 @@ begin
                 p <= '0';
             elsif in_ready and in_valid then
                 p <= '1';
-            elsif cnt = 2*N then
+            elsif cnt = 3*N - 3 then
                 p <= '0';
             end if;
             cnt <= next_cnt;
@@ -123,78 +127,83 @@ begin
 
         -- Should be a case in the future.
         if next_cnt = LAST then
+            for i in 0 to -1 loop
+                c_row(i) <= buf(i, -1 - i);
+            end loop;
             for i in 0 to N - 1 loop
                 c_row(i) <= SE(LAST - i, LAST);
             end loop;
-
             -- Buffer c21, c31, ..., cN1
             for i in 0 to N - 2 loop
-                buf_col1(i) <= SE(LAST, LAST - 1 - i);
+                buf(0, i) <= SE(LAST, LAST - 1 - i);
             end loop;
         elsif next_cnt = LAST + 1 then
-            -- Output c21
-            c_row(0) <= buf_col1(0);
-
+            -- Buffered elements
+            for i in 0 to 0 loop
+                c_row(i) <= buf(i, 0 - i);
+            end loop;
             -- Output c22, c23, ..., c2N
             for i in 1 to N - 1 loop
                 c_row(i) <= SE(LAST - i + 1, LAST);
             end loop;
-
             -- Buffer c32, c42, ...
             for i in 0 to N - 3 loop
-                buf_col2(i) <= SE(LAST, LAST - 1 - i);
+                buf(1, i) <= SE(LAST, LAST - 1 - i);
             end loop;
         elsif next_cnt = LAST + 2 then
             -- Output c31, c32
-            c_row(0) <= buf_col1(1);
-            c_row(1) <= buf_col2(0);
-
+            for i in 0 to 1 loop
+                c_row(i) <= buf(i, 1 - i);
+            end loop;
             -- Output c33, c34
             for i in 2 to N - 1 loop
                 c_row(i) <= SE(LAST - i + 2, LAST);
             end loop;
-
             -- Buffer c43, c53, ...
             for i in 0 to N - 4 loop
-                buf_col3(i) <= SE(LAST, LAST - 1 - i);
+                buf(2, i) <= SE(LAST, LAST - 1 - i);
             end loop;
         elsif next_cnt = LAST + 3 then
             -- Output c41, c42, c43
-            c_row(0) <= buf_col1(2);
-            c_row(1) <= buf_col2(1);
-            c_row(2) <= buf_col3(0);
-
+            for i in 0 to 2 loop
+                c_row(i) <= buf(i, 2 - i);
+            end loop;
             -- Output c44
             for i in 3 to N - 1 loop
                 c_row(i) <= SE(LAST - i + 3, LAST);
             end loop;
-
-            -- Buffer c54, 64, ...
+            -- Buffer c54, c64, ...
             for i in 0 to N - 5 loop
-                buf_col4(i) <= SE(LAST, LAST - 1 - i);
+                buf(3, i) <= SE(LAST, LAST - 1 - i);
+            end loop;
+        elsif next_cnt = LAST + 4 then
+            -- Output buffered elements
+            for i in 0 to 3 loop
+                c_row(i) <= buf(i, 3 - i);
+            end loop;
+            -- Output c55
+            for i in 4 to N - 1 loop
+                c_row(i) <= SE(LAST - i + 4, LAST);
+            end loop;
+            -- Bufferr c65, c75
+            for i in 0 to N - 6 loop
+                buf(4, i) <= SE(LAST, LAST - 1 - i);
             end loop;
         else
             -- Default things, to avoid latches being inferred.
             for i in 0 to N - 1 loop
                 c_row(i) <= 0;
             end loop;
-            for i in 0 to N - 2 loop
-                buf_col1(i) <= 0;
-            end loop;
-            for i in 0 to N - 3 loop
-                buf_col2(i) <= 0;
-            end loop;
-            for i in 0 to N - 4 loop
-                buf_col3(i) <= 0;
-            end loop;
-            for i in 0 to N - 5 loop
-                buf_col4(i) <= 0;
+            for i in 0 to N loop
+                for j in 0 to N - 2 loop
+                    buf(i, j) <= 0;
+                end loop;
             end loop;
         end if;
 
         if rising_edge(clk) then
             if p then
-                report_systolic;
+                --report_systolic;
             end if;
             if rstn = '0' then
                 for r in 0 to LAST loop

@@ -1,15 +1,18 @@
--- [[3 6 9 0]
---  [4 5 8 6]
---  [0 6 8 5]
---  [9 7 4 9]]
--- [[9 7 5 6]
---  [2 2 7 7]
---  [4 2 8 3]
---  [4 7 0 8]]
--- [[ 75  51 129  87]
---  [102  96 119 131]
---  [ 64  63 106 106]
---  [147 148 126 187]]
+-- [[7 7 0 1 1]
+--  [3 1 6 1 5]
+--  [4 6 2 6 6]
+--  [4 1 0 2 6]
+--  [6 9 5 2 4]]
+-- [[7 7 5 9 4]
+--  [1 9 8 7 0]
+--  [4 1 6 2 5]
+--  [0 0 8 9 4]
+--  [0 6 3 6 0]]
+-- [[ 56 118 102 127  32]
+--  [ 46  66  82  85  46]
+--  [ 42 120 146 172  50]
+--  [ 29  73  62  97  24]
+--  [ 71 152 160 169  57]]
 
 -- Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
 library bjourne;
@@ -29,6 +32,10 @@ architecture beh of tb_systolic is
 
     signal in_valid4, in_ready4 : std_logic;
     signal a_row4, b_col4, c_row4 : integer_vector(0 to 3);
+
+    signal in_valid5, in_ready5 : std_logic;
+    signal a_row5, b_col5, c_row5 : integer_vector(0 to 4);
+
 
     procedure tick(signal c : inout std_logic) is
     begin
@@ -159,7 +166,76 @@ architecture beh of tb_systolic is
 
         assert in_ready = '1';
     end;
+    procedure test5x5(signal clk0 : inout std_logic;
+                      signal in_valid : inout std_logic;
+                      signal in_ready : in std_logic;
+                      signal a_row : out integer_vector(0 to 4);
+                      signal b_col : out integer_vector(0 to 4);
+                      signal c_row : in integer_vector(0 to 4)) is
+    begin
+        assert in_ready = '1';
+        in_valid <= '1';
 
+        -- Tick 0
+        a_row <= (7, 7, 0, 1, 1);
+        b_col <= (7, 1, 4, 0, 0);
+        tick(clk0);
+
+        -- Tick 1
+        in_valid <= '0';
+        a_row <= (3, 1, 6, 1, 5);
+        b_col <= (7, 9, 1, 0, 6);
+        tick(clk0);
+
+        -- Tick 2
+        a_row <= (4, 6, 2, 6, 6);
+        b_col <= (5, 8, 6, 8, 3);
+        tick(clk0);
+
+        -- Tick 3
+        a_row <= (4, 1, 0, 2, 6);
+        b_col <= (9, 7, 2, 9, 6);
+        tick(clk0);
+
+        -- Tick 4
+        a_row <= (6, 9, 5, 2, 4);
+        b_col <= (4, 0, 5, 4, 0);
+        tick(clk0);
+
+        -- Tick 5
+        tick(clk0);
+
+        -- Tick 6
+        tick(clk0);
+
+        -- Tick 7
+        tick(clk0);
+
+        -- Tick 8
+        tick(clk0);
+
+        -- Tick 9
+        assert c_row = (56, 118, 102, 127, 32);
+        tick(clk0);
+
+        -- Tick 10
+        assert c_row = (46, 66, 82, 85, 46);
+        tick(clk0);
+
+        -- Tick 11
+        assert c_row = (42, 120, 146, 172, 50);
+        tick(clk0);
+
+        -- Tick 12
+        assert c_row = (29, 73, 62, 97, 24);
+        tick(clk0);
+
+        -- Tick 13
+        assert c_row = (71, 152, 160, 169, 57);
+        tick(clk0);
+
+        assert in_ready = '1';
+    end;
 begin
     systolic3: entity systolic
         generic map(
@@ -187,16 +263,32 @@ begin
             b_col => b_col4,
             c_row => c_row4
         );
+    systolic5: entity systolic
+        generic map(
+            N => 5
+        )
+        port map (
+            clk => clk,
+            rstn => rstn,
+            in_valid => in_valid5,
+            in_ready => in_ready5,
+            a_row => a_row5,
+            b_col => b_col5,
+            c_row => c_row5
+        );
     process
     begin
         a_row3 <= (-1, -1, -1);
         b_col3 <= (-1, -1, -1);
         a_row4 <= (-1, -1, -1, -1);
         b_col4 <= (-1, -1, -1, -1);
+        a_row5 <= (-1, -1, -1, -1, -1);
+        b_col5 <= (-1, -1, -1, -1, -1);
         reset(clk, rstn);
 
         test3x3(clk, in_valid3, in_ready3, a_row3, b_col3, c_row3);
         test4x4(clk, in_valid4, in_ready4, a_row4, b_col4, c_row4);
+        test5x5(clk, in_valid5, in_ready5, a_row5, b_col5, c_row5);
 
 
 
