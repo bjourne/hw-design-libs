@@ -15,14 +15,17 @@ entity systolic is
         in_ready : out std_logic;
         a_row : in integer_vector(0 to N - 1);
         b_col : in integer_vector(0 to N - 1);
-        c_out : out integer_vector(0 to N - 1)
+        c_row : out integer_vector(0 to N - 1)
     );
 end entity;
 
 architecture rtl of systolic is
-    type east_t is array(0 to N + 1, 0 to N + 2) of integer;
-    type south_t is array(0 to N + 2, 0 to N + 1) of integer;
-    type south_east_t is array(0 to N + 2, 0 to N + 2) of integer;
+
+    constant LAST : integer := 2*N - 1;
+
+    type east_t is array(0 to LAST - 1, 0 to LAST) of integer;
+    type south_t is array(0 to LAST, 0 to LAST - 1) of integer;
+    type south_east_t is array(0 to LAST, 0 to LAST) of integer;
 
     signal cnt : natural;
     signal p : std_logic;
@@ -39,24 +42,24 @@ architecture rtl of systolic is
         variable file_line : line;
         file fptr : text;
     begin
-        -- write(file_line, string'("Tick #"));
-        -- write(file_line, cnt);
-        -- write(file_line, string'(" E:"));
-        -- writeline(output, file_line);
-        -- for r in 0 to N + 1 loop
-        --     write(file_line, r, right, 3);
-        --     for c in 0 to N + 2 loop
-        --         write(file_line, E(r, c), right, 4);
-        --     end loop;
-        --     writeline(output, file_line);
-        -- end loop;
+        write(file_line, string'("Tick #"));
+        write(file_line, cnt);
+        write(file_line, string'(" E:"));
+        writeline(output, file_line);
+        for r in 0 to LAST - 1 loop
+            write(file_line, r, right, 3);
+            for c in 0 to LAST loop
+                write(file_line, E(r, c), right, 4);
+            end loop;
+            writeline(output, file_line);
+        end loop;
         write(file_line, string'("Tick #"));
         write(file_line, cnt);
         write(file_line, string'(" SE:"));
         writeline(output, file_line);
-        for r in 0 to N + 2 loop
+        for r in 0 to LAST loop
             write(file_line, r, right, 3);
-            for c in 0 to N + 2 loop
+            for c in 0 to LAST loop
                 write(file_line, SE(r, c), right, 4);
             end loop;
             writeline(output, file_line);
@@ -91,80 +94,89 @@ begin
         end loop;
         case next_cnt is
             when 0 =>
-                for i in 0 to N - 1 loop
-                    E(i, 0) <= a_row(i);
-                    S(0, i) <= b_col(i);
+                for i in 0 to -1 loop
+                    E(i, 0) <= 0;
+                    S(0, i) <= 0;
                 end loop;
-                for i in N to N + 1 loop
+                for i in 0 to N - 1 loop
+                    E(i, 0) <= a_row(i - 0);
+                    S(0, i) <= b_col(i - 0);
+                end loop;
+                for i in N to LAST - 1 loop
                     E(i, 0) <= 0;
                     S(0, i) <= 0;
                 end loop;
             when 1 =>
-                for i in 0 to N - 1 loop
-                    E(1 + i, 0) <= a_row(i);
-                    S(0, 1 + i) <= b_col(i);
+                for i in 0 to 0 loop
+                    E(i, 0) <= 0;
+                    S(0, i) <= 0;
                 end loop;
-                E(0, 0) <= 0;
-                E(N + 1, 0) <= 0;
-                S(0, 0) <= 0;
-                S(0, N + 1) <= 0;
+                for i in 1 to N loop
+                    E(i, 0) <= a_row(i - 1);
+                    S(0, i) <= b_col(i - 1);
+                end loop;
+                for i in N + 1 to LAST - 1 loop
+                    E(i, 0) <= 0;
+                    S(0, i) <= 0;
+                end loop;
             when 2 =>
-                E(0, 0) <= 0;
-                E(1, 0) <= 0;
-                E(2, 0) <= a_row(0);
-                E(3, 0) <= a_row(1);
-                E(4, 0) <= a_row(2);
-
-                S(0, 0) <= 0;
-                S(0, 1) <= 0;
-                S(0, 2) <= b_col(0);
-                S(0, 3) <= b_col(1);
-                S(0, 4) <= b_col(2);
+                for i in 0 to 1 loop
+                    E(i, 0) <= 0;
+                    S(0, i) <= 0;
+                end loop;
+                for i in 2 to N + 1 loop
+                    E(i, 0) <= a_row(i - 2);
+                    S(0, i) <= b_col(i - 2);
+                end loop;
+                for i in N + 2 to LAST - 1 loop
+                    E(i, 0) <= 0;
+                    S(0, i) <= 0;
+                end loop;
             when 5 =>
-                c_out(0) <= SE(5, 5);
-                c_out(1) <= SE(4, 5);
-                c_out(2) <= SE(3, 5);
-
-                buf(0) <= SE(5, 4);
-                buf(1) <= SE(5, 3);
+                c_row(0) <= SE(LAST - 0, LAST);
+                c_row(1) <= SE(LAST - 1, LAST);
+                c_row(2) <= SE(LAST - 2, LAST);
+                buf(0) <=   SE(LAST, LAST - 1);
+                buf(1) <=   SE(LAST, LAST - 2);
             when 6 =>
-                c_out(0) <= buf(0);
-                c_out(1) <= SE(5, 5);
-                c_out(2) <= SE(4, 5);
-
-                buf(0) <= SE(5, 4);
+                c_row(0) <= buf(0);
+                c_row(1) <= SE(LAST - 0, LAST);
+                c_row(2) <= SE(LAST - 1, LAST);
+                buf(0) <=   SE(LAST, LAST - 1);
             when 7 =>
-                c_out(0) <= buf(1);
-                c_out(1) <= buf(0);
-                c_out(2) <= SE(5, 5);
+                c_row(0) <= buf(1);
+                c_row(1) <= buf(0);
+                c_row(2) <= SE(LAST, LAST);
             when others =>
                 for i in 0 to N + 1 loop
                     E(i, 0) <= -1;
                     S(0, i) <= -1;
                 end loop;
                 for i in 0 to N - 1 loop
-                    c_out(i) <= 0;
+                    c_row(i) <= 0;
                 end loop;
                 buf(0) <= -1;
                 buf(1) <= -1;
         end case;
         if rising_edge(clk) then
-            report_systolic;
+            if p then
+                report_systolic;
+            end if;
             if rstn = '0' then
-                for r in 0 to N + 2 loop
-                    for c in 0 to N + 2 loop
-                        if r < N + 2 then
+                for r in 0 to LAST loop
+                    for c in 0 to LAST loop
+                        if r < LAST then
                             E(r, c) <= -1;
                         end if;
                         SE(r, c) <= -1;
-                        if c < N + 2 then
+                        if c < LAST then
                             S(r, c) <= -1;
                         end if;
                     end loop;
                 end loop;
             else
-                for r in 0 to N + 1 loop
-                    for c in 0 to N + 1 loop
+                for r in 0 to LAST - 1 loop
+                    for c in 0 to LAST - 1 loop
                         SE(r + 1, c + 1) <= SE(r, c) + S(r, c) * E(r, c);
                         E(r, c + 1) <= E(r, c);
                         S(r + 1, c) <= S(r, c);
