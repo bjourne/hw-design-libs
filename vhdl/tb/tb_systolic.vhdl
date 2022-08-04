@@ -9,6 +9,53 @@ entity tb_systolic is
 end tb_systolic;
 
 architecture beh of tb_systolic is
+
+    -- 2d arrays are annoying in vhdl
+    constant mat_a_3x3 : integer_vector(0 to 8) := (
+        15, 2, 3,
+        4, 5, 6,
+        7, 8, 9
+    );
+    constant mat_b_3x3 : integer_vector(0 to 8) := (
+        10, 11, 12,
+        13, 14, 15,
+        16, 17, 18
+    );
+    constant mat_c_3x3 : integer_vector(0 to 8) := (
+        224, 244, 264,
+        201, 216, 231,
+        318, 342, 366
+    );
+
+    constant mat_a_7x7 : integer_vector(0 to 48) := (
+        10, 0, 12, 17, 9, 19, 12,
+        15, 17, 2, 0,  7,  1,  3,
+        9, 19, 15, 11, 15, 16, 13,
+        7, 6, 19, 0, 11, 19, 14,
+        5, 4, 19, 0, 2, 1, 9,
+        6, 2, 14, 8, 10, 16, 8,
+        12, 7, 2, 14, 19, 19, 1
+    );
+    constant mat_b_7x7 : integer_vector(0 to 48) := (
+        16, 6, 16, 0, 9, 0, 2,
+        9, 18, 17, 16, 13, 15, 2,
+        15, 9, 11, 19, 18, 17, 0,
+        19, 5, 12, 1, 5, 7, 0,
+        19, 12, 5, 2, 1, 19, 3,
+        8, 17, 0, 5, 12, 13, 19,
+        19, 10, 11, 17, 1, 4, 16
+    );
+    constant mat_c_7x7 : integer_vector(0 to 48) := (
+        1214, 804, 673, 562, 640, 789, 600,
+        621, 545, 619, 380, 414, 447, 152,
+        1409, 1168, 982, 931, 873, 1162, 613,
+        1078, 916, 632, 812, 736, 925, 644,
+        618, 404, 466, 587, 462, 470, 187,
+        946, 710, 518, 542, 582, 754, 478,
+        1083, 847, 607, 314, 553, 849, 472
+    );
+
+
     signal clk : std_logic;
     signal rstn : std_logic;
     signal in_valid3, in_ready3 : std_logic;
@@ -46,99 +93,46 @@ architecture beh of tb_systolic is
         tick(clk0);
     end;
 
-    procedure test7x7(signal clk0 : inout std_logic;
-                      signal in_valid : inout std_logic;
-                      signal in_ready : in std_logic;
-                      signal a_row : out integer_vector(0 to 6);
-                      signal b_col : out integer_vector(0 to 6);
-                      signal c_row : in integer_vector(0 to 6)) is
+    procedure test_matmul(size : positive;
+                          mat_a : integer_vector;
+                          mat_b : integer_vector;
+                          mat_c : integer_vector;
+                          signal clk0 : inout std_logic;
+                          signal in_valid : inout std_logic;
+                          signal in_ready : in std_logic;
+                          signal a_row : out integer_vector;
+                          signal b_col : out integer_vector;
+                          signal c_row : in integer_vector) is
     begin
         assert in_ready = '1';
         in_valid <= '1';
 
-        -- Tick 0
-        a_row <= (10, 0, 12, 17, 9, 19, 12);
-        b_col <= (16, 9, 15, 19, 19, 8, 19);
-        tick(clk0);
+        -- Tick 0 to 6
+        for pass in 0 to size - 1 loop
+            if pass > 0 then
+                assert in_ready = '0';
+                in_valid <= '0';
+            end if;
+            for i in 0 to size - 1 loop
+                a_row(i) <= mat_a(size * pass + i);
+                b_col(i) <= mat_b(size * i + pass);
+            end loop;
+            tick(clk0);
+        end loop;
 
-        -- Tick 1
-        a_row <= (15, 17, 2, 0,  7,  1,  3);
-        b_col <= ( 6, 18, 9, 5, 12, 17, 10);
-        tick(clk0);
+        -- Tick 7 to 12
+        for pass in 0 to size - 2 loop
+            tick(clk0);
+        end loop;
 
-        -- Tick 2
-        a_row <= (9, 19, 15, 11, 15, 16, 13);
-        b_col <= (16, 17, 11, 12, 5, 0, 11);
-        tick(clk0);
-
-        -- Tick 3
-        a_row <= (7, 6, 19, 0, 11, 19, 14);
-        b_col <= (0, 16, 19, 1, 2, 5, 17);
-        tick(clk0);
-
-        -- Tick 4
-        a_row <= (5, 4, 19, 0, 2, 1, 9);
-        b_col <= (9, 13, 18, 5, 1, 12, 1);
-        tick(clk0);
-
-        -- Tick 5
-        a_row <= (6, 2, 14, 8, 10, 16, 8);
-        b_col <= (0, 15, 17, 7, 19, 13, 4);
-        tick(clk0);
-
-        -- Tick 6
-        a_row <= (12, 7, 2, 14, 19, 19, 1);
-        b_col <= (2, 2, 0, 0, 3, 19, 16);
-        tick(clk0);
-
-        -- Tick 7
-        tick(clk0);
-
-        -- Tick 8
-        tick(clk0);
-
-        -- Tick 9
-        tick(clk0);
-
-        -- Tick 10
-        tick(clk0);
-
-        -- Tick 11
-        tick(clk0);
-
-        -- Tick 12
-        tick(clk0);
-
-        -- Tick 13
-        assert c_row = (1214, 804, 673, 562, 640, 789, 600);
-        tick(clk0);
-
-        -- Tick 14
-        assert c_row = (621, 545, 619, 380, 414, 447, 152);
-        tick(clk0);
-
-        -- Tick 15
-        assert c_row = (1409, 1168, 982, 931, 873, 1162, 613);
-        tick(clk0);
-
-        -- Tick 16
-        assert c_row = (1078, 916, 632, 812, 736, 925, 644);
-        tick(clk0);
-
-        -- Tick 17
-        assert c_row = (618, 404, 466, 587, 462, 470, 187);
-        tick(clk0);
-
-        -- Tick 18
-        assert c_row = (946, 710, 518, 542, 582, 754, 478);
-        tick(clk0);
-
-        -- Tick 18
-        assert c_row = (1083, 847, 607, 314, 553, 849, 472);
-        tick(clk0);
-
+        -- Tick 13 to 19
+        for pass in 0 to size - 1 loop
+            for i in 0 to size - 1 loop
+                assert c_row(i) = mat_c(size * pass + i);
+            end loop;
+            tick(clk0);
+        end loop;
         assert in_ready = '1';
-
     end procedure;
 
     procedure test6x6(signal clk0 : inout std_logic;
@@ -222,57 +216,6 @@ architecture beh of tb_systolic is
 
         assert in_ready = '1';
     end procedure;
-
-    procedure test3x3(signal clk0 : inout std_logic;
-                      signal in_valid : inout std_logic;
-                      signal in_ready : in std_logic;
-                      signal a_row : inout integer_vector(0 to 2);
-                      signal b_col : inout integer_vector(0 to 2);
-                      signal c_row : in integer_vector(0 to 2)) is
-    begin
-        assert in_ready = '1';
-        in_valid <= '1';
-        -- Tick 0
-        a_row <= (15, 2, 3);
-        b_col <= (10, 13, 16);
-        tick(clk0);
-
-        -- Tick 1
-        assert in_ready3 = '0';
-        in_valid <= '0';
-        a_row <= (4, 5, 6);
-        b_col <= (11, 14, 17);
-        tick(clk0);
-
-        -- Tick 2
-        a_row <= (7, 8, 9);
-        b_col <= (12, 15, 18);
-        tick(clk0);
-
-        -- Tick 3
-        a_row <= (0, 0, 0);
-        b_col <= (0, 0, 0);
-        tick(clk0);
-
-        -- Tick 4
-        tick(clk0);
-
-        -- Tick 5
-        assert c_row = (224, 244, 264);
-        tick(clk0);
-
-        -- Tick 6
-        assert c_row = (201, 216, 231);
-        tick(clk0);
-
-        -- Tick 7
-        assert c_row = (318, 342, 366);
-        tick(clk0);
-
-        assert in_ready = '1';
-
-    end;
-
     procedure test4x4(signal clk0 : inout std_logic;
                       signal in_valid : inout std_logic;
                       signal in_ready : in std_logic;
@@ -482,11 +425,13 @@ begin
         b_col7 <= (others => -1);
         reset(clk, rstn);
 
-        test3x3(clk, in_valid3, in_ready3, a_row3, b_col3, c_row3);
+        test_matmul(3, mat_a_3x3, mat_b_3x3, mat_c_3x3,
+                    clk, in_valid3, in_ready3, a_row3, b_col3, c_row3);
         test4x4(clk, in_valid4, in_ready4, a_row4, b_col4, c_row4);
         test5x5(clk, in_valid5, in_ready5, a_row5, b_col5, c_row5);
         test6x6(clk, in_valid6, in_ready6, a_row6, b_col6, c_row6);
-        test7x7(clk, in_valid7, in_ready7, a_row7, b_col7, c_row7);
+        test_matmul(7, mat_a_7x7, mat_b_7x7, mat_c_7x7,
+                    clk, in_valid7, in_ready7, a_row7, b_col7, c_row7);
 
         assert false report "all tests passed" severity note;
         wait;
