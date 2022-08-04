@@ -1,3 +1,16 @@
+-- [[3 6 9 0]
+--  [4 5 8 6]
+--  [0 6 8 5]
+--  [9 7 4 9]]
+-- [[9 7 5 6]
+--  [2 2 7 7]
+--  [4 2 8 3]
+--  [4 7 0 8]]
+-- [[ 75  51 129  87]
+--  [102  96 119 131]
+--  [ 64  63 106 106]
+--  [147 148 126 187]]
+
 -- Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
 library bjourne;
 library ieee;
@@ -50,29 +63,39 @@ begin
             b_col => b_col3,
             c_out => c_out3
         );
-    systolic4: entity systolic
-        generic map(
-            N => 4
-        )
-        port map (
-            clk => clk,
-            rstn => rstn,
-            in_valid => in_valid4,
-            in_ready => in_ready4,
-            a_row => a_row4,
-            b_col => b_col4,
-            c_out => c_out4
-        );
+    -- systolic4: entity systolic
+    --     generic map(
+    --         N => 4
+    --     )
+    --     port map (
+    --         clk => clk,
+    --         rstn => rstn,
+    --         in_valid => in_valid4,
+    --         in_ready => in_ready4,
+    --         a_row => a_row4,
+    --         b_col => b_col4,
+    --         c_out => c_out4
+    --     );
     process
     begin
+        a_row3 <= (-1, -1, -1);
+        b_col3 <= (-1, -1, -1);
+        a_row4 <= (-1, -1, -1, -1);
+        b_col4 <= (-1, -1, -1, -1);
         reset(clk, rstn);
 
-        assert in_ready4 = '1';
-        in_valid4 <= '1';
 
-        a_row4 <= (3, 6, 9, 0);
-        b_col4 <= (9, 2, 4, 4);
-        tick(clk);
+        -- assert in_ready4 = '1';
+        -- in_valid4 <= '1';
+
+        -- a_row4 <= (3, 6, 9, 0);
+        -- b_col4 <= (9, 2, 4, 4);
+        -- tick(clk);
+
+        -- a_row4 <= (4, 5, 8, 6);
+        -- b_col4 <= (7, 2, 2, 7);
+        -- tick(clk);
+
 
         assert in_ready3 = '1';
         in_valid3 <= '1';
@@ -82,6 +105,7 @@ begin
         tick(clk);
 
         -- Tick 1
+        assert in_ready3 = '0';
         in_valid3 <= '0';
         a_row3 <= (4, 5, 6);
         b_col3 <= (11, 14, 17);
@@ -95,20 +119,23 @@ begin
         -- Tick 3
         a_row3 <= (0, 0, 0);
         b_col3 <= (0, 0, 0);
-
         tick(clk);
-        assert c_out3 = (244, 224, 201);
 
+        -- Tick 4
         tick(clk);
-        assert c_out3 = (264, 216, 318);
 
+        -- Tick 5
+        assert c_out3 = (224, 244, 264);
         tick(clk);
-        assert c_out3 = (231, 216, 342);
 
+        -- Tick 6
+        assert c_out3 = (201, 216, 231);
         tick(clk);
-        assert c_out3 = (366, 366, 366);
+
+        -- Tick 7
+        assert c_out3 = (318, 342, 366);
         assert in_ready3 = '1';
-
+        tick(clk);
 
         assert false report "all tests passed" severity note;
         wait;
