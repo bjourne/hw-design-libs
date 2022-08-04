@@ -94,16 +94,18 @@ architecture beh of tb_systolic is
 
         -- Tick 7
         assert c_row = (318, 342, 366);
-        assert in_ready = '1';
         tick(clk0);
+
+        assert in_ready = '1';
 
     end;
 
     procedure test4x4(signal clk0 : inout std_logic;
                       signal in_valid : inout std_logic;
                       signal in_ready : in std_logic;
-                      signal a_row : inout integer_vector(0 to 3);
-                      signal b_col : inout integer_vector(0 to 3)) is
+                      signal a_row : out integer_vector(0 to 3);
+                      signal b_col : out integer_vector(0 to 3);
+                      signal c_row : in integer_vector(0 to 3)) is
     begin
         assert in_ready = '1';
         in_valid <= '1';
@@ -125,9 +127,37 @@ architecture beh of tb_systolic is
         b_col <= (5, 7, 8, 0);
         tick(clk0);
 
+        -- Tick 3
+        a_row <= (9, 7, 4, 9);
+        b_col <= (6, 7, 3, 8);
         tick(clk0);
 
+        -- Tick 4
+        tick(clk0);
 
+        -- Tick 5
+        tick(clk0);
+
+        -- Tick 6
+        tick(clk0);
+
+        -- Tick 7
+        assert c_row = (75, 51, 129, 87);
+        tick(clk0);
+
+        -- Tick 8
+        assert c_row = (102, 96, 119, 131);
+        tick(clk0);
+
+        -- Tick 9
+        assert c_row = (64, 63, 106, 106);
+        tick(clk0);
+
+        -- Tick 10
+        assert c_row = (147, 148, 126, 187);
+        tick(clk0);
+
+        assert in_ready = '1';
     end;
 
 begin
@@ -166,7 +196,7 @@ begin
         reset(clk, rstn);
 
         test3x3(clk, in_valid3, in_ready3, a_row3, b_col3, c_row3);
-        --test4x4(clk, in_valid4, in_ready4, a_row4, b_col4);
+        test4x4(clk, in_valid4, in_ready4, a_row4, b_col4, c_row4);
 
 
 
