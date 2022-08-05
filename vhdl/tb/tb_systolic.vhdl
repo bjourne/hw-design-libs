@@ -216,7 +216,7 @@ architecture beh of tb_systolic is
         variable r_cycle, w_cycle : natural;
     begin
         start0 <= '1';
-        for pass in 0 to N * 10 loop
+        for pass in 0 to 10 * N loop
             w_cycle := pass rem N;
             for i in 0 to N - 1 loop
                 a_row(i) <= mat_a(N * w_cycle + i);
@@ -302,7 +302,7 @@ begin
     systolic16: entity systolic
         generic map(
             N => 16,
-            DEBUG => true
+            DEBUG => false
         )
         port map (
             clk => clk,

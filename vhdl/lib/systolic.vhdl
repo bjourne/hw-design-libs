@@ -53,8 +53,8 @@ begin
         variable next_cnt, r_cycle, w_cycle : natural;
     begin
         next_cnt := 0 when start else cnt + 1;
-        r_cycle := next_cnt rem N;
-        w_cycle := (next_cnt + 1) rem N;
+        r_cycle := 0 when next_cnt = N else next_cnt;
+        w_cycle := 0 when r_cycle + 1 = N else r_cycle + 1;
         for i in 0 to WIDTH loop
             SE(0, i) <= 0;
         end loop;
@@ -86,7 +86,6 @@ begin
             if DEBUG then
                 debug_systolic;
             end if;
-            cnt <= next_cnt;
             if rstn = '0' then
                 cnt <= 0;
             else
@@ -97,6 +96,7 @@ begin
                         E(r, c + 1) <= E(r, c);
                     end loop;
                 end loop;
+                cnt <= 0 when next_cnt = N else next_cnt;
             end if;
         end if;
     end process;
