@@ -101,5 +101,6 @@ def build(ctx):
         build_vhdl_tb(ctx, 'tb_math', 'bjourne')
         build_vhdl_tb(ctx, 'tb_parity', 'bjourne')
         build_vhdl_tb(ctx, 'tb_systolic', 'bjourne')
+        build_vhdl_tb(ctx, 'tb_systolic2', 'bjourne')
     else:
         build_vhdl_tbs_no_gen(ctx, vhdl_tb_files, 'bjourne')
