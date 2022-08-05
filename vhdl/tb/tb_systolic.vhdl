@@ -5,10 +5,10 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use bjourne.all;
 
-entity tb_systolic2 is
-end tb_systolic2;
+entity tb_systolic is
+end tb_systolic;
 
-architecture beh of tb_systolic2 is
+architecture beh of tb_systolic is
     -- 2d arrays are annoying in vhdl
     constant mat_a_3x3 : integer_vector(0 to 8) := (
         15, 2, 3,
@@ -190,7 +190,7 @@ architecture beh of tb_systolic2 is
     end;
 
     procedure reset(signal clk0 : inout std_logic;
-                    signal rstn0 : inout std_logic) is
+                    signal rstn0 : out std_logic) is
     begin
         clk0 <= '0';
         rstn0 <= '0';
@@ -200,51 +200,41 @@ architecture beh of tb_systolic2 is
         rstn0 <= '1';
         tick(clk0);
     end;
-    procedure write_input(size : positive;
-                          pass : natural;
-                          mat_a : integer_vector;
-                          mat_b : integer_vector;
-                          signal a_row : out integer_vector;
-                          signal b_col : out integer_vector) is
-    begin
-        for i in 0 to size - 1 loop
-            a_row(i) <= mat_a(size * pass + i);
-            b_col(i) <= mat_b(size * i + pass);
-        end loop;
-    end procedure;
-    procedure read_output(size : positive;
-                          pass : natural;
-                          mat_c : integer_vector;
-                          signal c_row : in integer_vector) is
-    begin
-        for i in 0 to size - 1 loop
-            assert c_row(i) = mat_c(size * pass + i);
-        end loop;
-    end procedure;
-    procedure test_matmul_streaming(size : positive;
-                                    mat_a1 : integer_vector;
-                                    mat_b1 : integer_vector;
-                                    mat_c1 : integer_vector;
-                                    signal clk0 : inout std_logic;
-                                    signal start0 : out std_logic;
-                                    signal a_row : out integer_vector;
-                                    signal b_col : out integer_vector;
-                                    signal c_row : in integer_vector) is
-        constant latency : positive := 2 * size - 2;
+
+    -- Every cycle the next row-column pair of the input matrices are
+    -- written to the array. Then 2N - 2 cycles later the first row of
+    -- the result is read from the array.
+    procedure test_matmul_streaming(
+        N : positive;
+        mat_a, mat_b, mat_c : integer_vector;
+        signal clk0 : inout std_logic;
+        signal start0 : out std_logic;
+        signal a_row, b_col : out integer_vector;
+        signal c_row : in integer_vector
+    ) is
+        constant latency : positive := 2 * N - 2;
+        variable r_cycle, w_cycle : natural;
     begin
         start0 <= '1';
-        for pass in 0 to size * 10 loop
-            write_input(size, pass rem size, mat_a1, mat_b1, a_row, b_col);
+        for pass in 0 to N * 10 loop
+            w_cycle := pass rem N;
+            for i in 0 to N - 1 loop
+                a_row(i) <= mat_a(N * w_cycle + i);
+                b_col(i) <= mat_b(N * i + w_cycle);
+            end loop;
             tick(clk0);
             if pass = 0 then
                 start0 <= '0';
             elsif pass >= latency then
-                read_output(size, (pass - latency) rem size, mat_c1, c_row);
+                r_cycle := (pass - latency) rem N;
+                for i in 0 to N - 1 loop
+                    assert c_row(i) = mat_c(N * r_cycle + i);
+                end loop;
             end if;
         end loop;
     end procedure;
 begin
-    systolic3: entity systolic2
+    systolic3: entity systolic
         generic map(
             N => 3,
             DEBUG => false
@@ -257,7 +247,7 @@ begin
             b_col => b_col3,
             c_row => c_row3
         );
-    systolic4: entity systolic2
+    systolic4: entity systolic
         generic map(
             N => 4,
             DEBUG => false
@@ -270,7 +260,7 @@ begin
             b_col => b_col4,
             c_row => c_row4
         );
-    systolic5: entity systolic2
+    systolic5: entity systolic
         generic map(
             N => 5,
             DEBUG => false
@@ -283,7 +273,7 @@ begin
             b_col => b_col5,
             c_row => c_row5
         );
-    systolic6: entity systolic2
+    systolic6: entity systolic
         generic map(
             N => 6,
             DEBUG => false
@@ -296,7 +286,7 @@ begin
             b_col => b_col6,
             c_row => c_row6
         );
-    systolic7: entity systolic2
+    systolic7: entity systolic
         generic map(
             N => 7,
             DEBUG => false
@@ -309,7 +299,7 @@ begin
             b_col => b_col7,
             c_row => c_row7
         );
-    systolic16: entity systolic2
+    systolic16: entity systolic
         generic map(
             N => 16,
             DEBUG => true

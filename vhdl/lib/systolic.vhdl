@@ -9,7 +9,7 @@ use ieee.numeric_std.all;
 use ieee.std_logic_1164.all;
 use std.textio.all;
 
-entity systolic2 is
+entity systolic is
     generic(
         N : integer; DEBUG : boolean
     );
@@ -20,7 +20,7 @@ entity systolic2 is
         c_row : out integer_vector(0 to N - 1)
     );
 end entity;
-architecture rtl of systolic2 is
+architecture rtl of systolic is
     constant HEIGHT : integer := 3*N - 2;
     constant WIDTH : integer := 2*N - 1;
 
