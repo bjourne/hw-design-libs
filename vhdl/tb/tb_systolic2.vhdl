@@ -43,24 +43,6 @@ architecture beh of tb_systolic2 is
         711, 551, 534, 445,
         382, 79, 329, 149
     );
-    constant mat_a2_4x4 : integer_vector(0 to 15) := (
-        0, 13, 34, 27,
-        42, 46, 32, 39,
-        13, 34, 42, 27,
-        5, 45, 26, 48
-    );
-    constant mat_b2_4x4 : integer_vector(0 to 15) := (
-        32, 17, 23, 46,
-        15, 4, 14, 41,
-        5, 9, 29, 18,
-        45, 25, 25, 2
-    );
-    constant mat_c2_4x4 : integer_vector(0 to 15) := (
-        1580, 1033, 1843, 1199,
-        3949, 2161, 3513, 4472,
-        2351, 1410, 2668, 2802,
-        3125, 1699, 2699, 2639
-    );
     constant mat_a_5x5 : integer_vector(0 to 24) := (
         8, 8, 1, 3, 0,
         6, 0, 19, 7, 5,
@@ -218,48 +200,6 @@ architecture beh of tb_systolic2 is
         rstn0 <= '1';
         tick(clk0);
     end;
-    procedure test_matmul(size : positive;
-                          mat_a : integer_vector;
-                          mat_b : integer_vector;
-                          mat_c : integer_vector;
-                          signal clk0 : inout std_logic;
-                          signal in_v : inout std_logic;
-                          signal in_r : in std_logic;
-                          signal a_row : out integer_vector;
-                          signal b_col : out integer_vector;
-                          signal c_row : in integer_vector) is
-    begin
-        assert in_r = '1';
-        in_v <= '1';
-
-        -- Push data into the array
-        for pass in 0 to size - 1 loop
-            if pass > 0 then
-                assert in_r = '0';
-                in_v <= '0';
-            end if;
-            for i in 0 to size - 1 loop
-                a_row(i) <= mat_a(size * pass + i);
-                b_col(i) <= mat_b(size * i + pass);
-            end loop;
-            tick(clk0);
-        end loop;
-        for i in 0 to size - 1 loop
-            a_row(i) <= 0;
-            b_col(i) <= 0;
-        end loop;
-        for pass in 0 to size - 2 loop
-            tick(clk0);
-        end loop;
-        for pass in 0 to size - 1 loop
-            for i in 0 to size - 1 loop
-                assert c_row(i) = mat_c(size * pass + i);
-            end loop;
-            tick(clk0);
-        end loop;
-        assert in_r = '1';
-    end procedure;
-
     procedure write_input(size : positive;
                           pass : natural;
                           mat_a : integer_vector;
@@ -272,7 +212,6 @@ architecture beh of tb_systolic2 is
             b_col(i) <= mat_b(size * i + pass);
         end loop;
     end procedure;
-
     procedure read_output(size : positive;
                           pass : natural;
                           mat_c : integer_vector;
@@ -282,107 +221,46 @@ architecture beh of tb_systolic2 is
             assert c_row(i) = mat_c(size * pass + i);
         end loop;
     end procedure;
-
     procedure test_matmul_streaming(size : positive;
                                     mat_a1 : integer_vector;
                                     mat_b1 : integer_vector;
                                     mat_c1 : integer_vector;
-                                    mat_a2 : integer_vector;
-                                    mat_b2 : integer_vector;
-                                    mat_c2 : integer_vector;
                                     signal clk0 : inout std_logic;
                                     signal start0 : out std_logic;
                                     signal a_row : out integer_vector;
                                     signal b_col : out integer_vector;
                                     signal c_row : in integer_vector) is
+        constant latency : positive := 2 * size - 2;
     begin
         start0 <= '1';
-
-        -- Push data into the array
-        write_input(size, 0, mat_a1, mat_b1, a_row, b_col);
-        tick(clk0);
-
-        start0 <= '0';
-
-        write_input(size, 1, mat_a1, mat_b1, a_row, b_col);
-        tick(clk0);
-
-        write_input(size, 2, mat_a1, mat_b1, a_row, b_col);
-        tick(clk0);
-
-        write_input(size, 3, mat_a1, mat_b1, a_row, b_col);
-        tick(clk0);
-
-        -- 3 empty cycles, begin pushing for second matrices
-        write_input(size, 0, mat_a2, mat_b2, a_row, b_col);
-        tick(clk0);
-
-        write_input(size, 1, mat_a2, mat_b2, a_row, b_col);
-        tick(clk0);
-
-        write_input(size, 2, mat_a2, mat_b2, a_row, b_col);
-        tick(clk0);
-
-
-        write_input(size, 3, mat_a2, mat_b2, a_row, b_col);
-        read_output(size, 0, mat_c1, c_row);
-        tick(clk0);
-
-        -- Begin writing first pair of matrices again
-        write_input(size, 0, mat_a1, mat_b1, a_row, b_col);
-        read_output(size, 1, mat_c1, c_row);
-        tick(clk0);
-
-        write_input(size, 1, mat_a1, mat_b1, a_row, b_col);
-        read_output(size, 2, mat_c1, c_row);
-        tick(clk0);
-
-        write_input(size, 2, mat_a1, mat_b1, a_row, b_col);
-        read_output(size, 3, mat_c1, c_row);
-        tick(clk0);
-
-        write_input(size, 3, mat_a1, mat_b1, a_row, b_col);
-        read_output(size, 0, mat_c2, c_row);
-        tick(clk0);
-
-        read_output(size, 1, mat_c2, c_row);
-        tick(clk0);
-
-        read_output(size, 2, mat_c2, c_row);
-        tick(clk0);
-
-        read_output(size, 3, mat_c2, c_row);
-        tick(clk0);
-
-        -- C1 is ready again.
-        read_output(size, 0, mat_c1, c_row);
-        tick(clk0);
-
-        read_output(size, 1, mat_c1, c_row);
-        tick(clk0);
-
-        read_output(size, 2, mat_c1, c_row);
-        tick(clk0);
-
-        read_output(size, 3, mat_c1, c_row);
-        tick(clk0);
+        for pass in 0 to size * 10 loop
+            write_input(size, pass rem size, mat_a1, mat_b1, a_row, b_col);
+            tick(clk0);
+            if pass = 0 then
+                start0 <= '0';
+            elsif pass >= latency then
+                read_output(size, (pass - latency) rem size, mat_c1, c_row);
+            end if;
+        end loop;
     end procedure;
 begin
-    -- systolic3: entity systolic2
-    --     generic map(
-    --         N => 3
-    --     )
-    --     port map (
-    --         clk => clk,
-    --         rstn => rstn,
-    --         start => start(0),
-    --         a_row => a_row3,
-    --         b_col => b_col3,
-    --         c_row => c_row3
-    --     );
+    systolic3: entity systolic2
+        generic map(
+            N => 3,
+            DEBUG => false
+        )
+        port map (
+            clk => clk,
+            rstn => rstn,
+            start => start(0),
+            a_row => a_row3,
+            b_col => b_col3,
+            c_row => c_row3
+        );
     systolic4: entity systolic2
         generic map(
-            N => 4
+            N => 4,
+            DEBUG => false
         )
         port map (
             clk => clk,
@@ -392,82 +270,85 @@ begin
             b_col => b_col4,
             c_row => c_row4
         );
-    -- systolic5: entity systolic2
-    --     generic map(
-    --         N => 5
-    --     )
-    --     port map (
-    --         clk => clk,
-    --         rstn => rstn,
-    --         start => start(2),
-    --         a_row => a_row5,
-    --         b_col => b_col5,
-    --         c_row => c_row5
-    --     );
-    -- systolic6: entity systolic2
-    --     generic map(
-    --         N => 6
-    --     )
-    --     port map (
-    --         clk => clk,
-    --         rstn => rstn,
-    --         start => start(3),
-    --         a_row => a_row6,
-    --         b_col => b_col6,
-    --         c_row => c_row6
-    --     );
-    -- systolic7: entity systolic2
-    --     generic map(
-    --         N => 7
-    --     )
-    --     port map (
-    --         clk => clk,
-    --         rstn => rstn,
-    --         start => start(4),
-    --         a_row => a_row7,
-    --         b_col => b_col7,
-    --         c_row => c_row7
-    --     );
-    -- systolic16: entity systolic2
-    --     generic map(
-    --         N => 16
-    --     )
-    --     port map (
-    --         clk => clk,
-    --         rstn => rstn,
-    --         start => start(5),
-    --         a_row => a_row16,
-    --         b_col => b_col16,
-    --         c_row => c_row16
-    --     );
-
+    systolic5: entity systolic2
+        generic map(
+            N => 5,
+            DEBUG => false
+        )
+        port map (
+            clk => clk,
+            rstn => rstn,
+            start => start(2),
+            a_row => a_row5,
+            b_col => b_col5,
+            c_row => c_row5
+        );
+    systolic6: entity systolic2
+        generic map(
+            N => 6,
+            DEBUG => false
+        )
+        port map (
+            clk => clk,
+            rstn => rstn,
+            start => start(3),
+            a_row => a_row6,
+            b_col => b_col6,
+            c_row => c_row6
+        );
+    systolic7: entity systolic2
+        generic map(
+            N => 7,
+            DEBUG => false
+        )
+        port map (
+            clk => clk,
+            rstn => rstn,
+            start => start(4),
+            a_row => a_row7,
+            b_col => b_col7,
+            c_row => c_row7
+        );
+    systolic16: entity systolic2
+        generic map(
+            N => 16,
+            DEBUG => true
+        )
+        port map (
+            clk => clk,
+            rstn => rstn,
+            start => start(5),
+            a_row => a_row16,
+            b_col => b_col16,
+            c_row => c_row16
+        );
     process
     begin
-        a_row4 <= (others => 0);
-        b_col4 <= (others => 0);
-        a_row16 <= (others => 0);
-        b_col16 <= (others => 0);
         reset(clk, rstn);
-        -- test_matmul(3, mat_a_3x3, mat_b_3x3, mat_c_3x3,
-        --             clk, in_valid(0), in_ready(0),
-        --             a_row3, b_col3, c_row3);
+        test_matmul_streaming(3,
+                              mat_a_3x3, mat_b_3x3, mat_c_3x3,
+                              clk, start(0),
+                              a_row3, b_col3, c_row3);
         test_matmul_streaming(4,
                               mat_a_4x4, mat_b_4x4, mat_c_4x4,
-                              mat_a2_4x4, mat_b2_4x4, mat_c2_4x4,
                               clk, start(1),
                               a_row4, b_col4, c_row4);
-        -- test_matmul(5, mat_a_5x5, mat_b_5x5, mat_c_5x5,
-        --             clk, in_valid(2), in_ready(2),
-        --             a_row5, b_col5, c_row5);
-        -- test_matmul(6, mat_a_6x6, mat_b_6x6, mat_c_6x6,
-        --             clk, in_valid(3), in_ready(3),
-        --             a_row6, b_col6, c_row6);
-        -- test_matmul(7, mat_a_7x7, mat_b_7x7, mat_c_7x7,
-        --             clk, in_valid(4), in_ready(4),
-        --             a_row7, b_col7, c_row7);
-        -- test_matmul(16, mat_a_16x16, mat_b_16x16, mat_c_16x16,
-        --             clk, in_valid(5), in_ready(5),
-        --             a_row16, b_col16, c_row16);
+        test_matmul_streaming(5,
+                              mat_a_5x5, mat_b_5x5, mat_c_5x5,
+                              clk, start(2),
+                              a_row5, b_col5, c_row5);
+        test_matmul_streaming(6,
+                              mat_a_6x6, mat_b_6x6, mat_c_6x6,
+                              clk, start(3),
+                              a_row6, b_col6, c_row6);
+        test_matmul_streaming(7,
+                              mat_a_7x7, mat_b_7x7, mat_c_7x7,
+                              clk, start(4),
+                              a_row7, b_col7, c_row7);
+        test_matmul_streaming(16,
+                              mat_a_16x16, mat_b_16x16, mat_c_16x16,
+                              clk, start(5),
+                              a_row16, b_col16, c_row16);
         assert false report "all tests passed" severity note;
         wait;
     end process;
