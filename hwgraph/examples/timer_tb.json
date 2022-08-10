@@ -5,6 +5,9 @@
         ["tick", 1],
         ["set", {"set" : 0}],
         ["tick", 10],
-        ["assert", {"timeout": 1}]
+        ["assert", {"timeout": 1}],
+        ["set", {"cnt": 2, "set" : 1}],
+        ["tick", 10],
+        ["assert", {"timeout": 0}]
     ]
 }]

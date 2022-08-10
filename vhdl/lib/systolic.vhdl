@@ -53,8 +53,6 @@ begin
         variable next_cnt, r_cycle, w_cycle : natural;
     begin
         next_cnt := 0 when start else cnt + 1;
-        r_cycle := 0 when next_cnt = N else next_cnt;
-        w_cycle := 0 when r_cycle + 1 = N else r_cycle + 1;
         for i in 0 to WIDTH loop
             SE(0, i) <= 0;
         end loop;
@@ -63,6 +61,7 @@ begin
         end loop;
 
         -- Write to north and west.
+        r_cycle := 0 when next_cnt = N else next_cnt;
         for i in 0 to r_cycle - 1 loop
             E(i, 0) <= 0;
             S(0, i) <= 0;
@@ -79,6 +78,7 @@ begin
         end loop;
 
         -- Read from east.
+        w_cycle := 0 when r_cycle + 1 = N else r_cycle + 1;
         for i in 0 to N - 1 loop
             c_row(i) <= SE(w_cycle + WIDTH - i, WIDTH);
         end loop;
