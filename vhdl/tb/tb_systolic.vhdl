@@ -314,6 +314,20 @@ begin
         );
     process
     begin
+        -- This initialization is necessary to prevent garbage from entering
+        -- the systolic array.
+        a_row3 <= (others => 0);
+        b_col3 <= (others => 0);
+        a_row4 <= (others => 0);
+        b_col4 <= (others => 0);
+        a_row5 <= (others => 0);
+        b_col5 <= (others => 0);
+        a_row6 <= (others => 0);
+        b_col6 <= (others => 0);
+        a_row7 <= (others => 0);
+        b_col7 <= (others => 0);
+        a_row16 <= (others => 0);
+        b_col16 <= (others => 0);
         reset(clk, rstn);
         test_matmul_streaming(3,
                               mat_a_3x3, mat_b_3x3, mat_c_3x3,

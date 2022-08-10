@@ -88,6 +88,9 @@ begin
             end if;
             if rstn = '0' then
                 cnt <= 0;
+                SE <= (others => (others => 0));
+                E <= (others => (others => 0));
+                S <= (others => (others => 0));
             else
                 for r in 0 to HEIGHT - 1 loop
                     for c in 0 to WIDTH - 1 loop
