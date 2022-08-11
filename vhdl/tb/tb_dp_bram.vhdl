@@ -9,19 +9,11 @@ entity tb_dp_bram is
 end tb_dp_bram;
 
 architecture beh of tb_dp_bram is
-    constant WIDTH : positive := 16;
     signal clk : std_logic;
     signal we_a, we_b : std_logic;
     signal addr_a, addr_b : natural;
     signal din_a, din_b : integer;
     signal dout_a, dout_b : integer;
-    procedure tick(signal c : inout std_logic) is
-    begin
-        wait for 10 ns;
-        c <= not c;
-        wait for 10 ns;
-        c <= not c;
-    end;
     constant numbers : integer_vector(0 to 255) := (
         4, 2, 0, 17, 11, 18, 0, 15, 7, 4, 8, 2, 12, 7, 5, 17,
         11, 18, 14, 16, 16, 19, 9, 11, 15, 12, 17, 13, 3, 9, 4, 17,
@@ -40,6 +32,101 @@ architecture beh of tb_dp_bram is
         12, 18, 15, 16, 9, 14, 0, 18, 3, 15, 14, 15, 14, 2, 17, 1,
         3, 19, 14, 1, 19, 19, 5, 0, 17, 7, 3, 16, 13, 1, 5, 18
     );
+    procedure tick(signal c : inout std_logic) is
+    begin
+        wait for 10 ns;
+        c <= not c;
+        wait for 10 ns;
+        c <= not c;
+    end;
+    procedure test_collissions(
+        signal clk0 : inout std_logic;
+        signal addr_a0 : out integer;
+        signal addr_b0 : out integer;
+        signal we_a0 : out std_logic;
+        signal we_b0 : out std_logic;
+        signal din_a0 : out integer;
+        signal din_b0 : out integer;
+        signal dout_a0 : in integer
+    ) is
+    begin
+
+        addr_a0 <= 0;
+        we_a0 <= '1';
+        din_a0 <= 1234;
+
+        tick(clk0);
+        assert dout_a = 1234;
+
+        addr_a0 <= 10;
+        din_a0 <= 4321;
+
+        tick(clk0);
+        assert dout_a = 4321;
+
+        addr_a0 <= 0;
+        we_a0 <= '0';
+        tick(clk0);
+        assert dout_a = 1234;
+
+        -- Collissions
+
+        addr_a0 <= 1;
+        addr_b0 <= 1;
+        din_a0 <= 5;
+        din_b0 <= 20;
+        we_a0 <= '1';
+        tick(clk0);
+        assert dout_a = 5;
+        assert dout_b = 5;
+
+        we_a0 <= '0';
+        we_b0 <= '1';
+        tick(clk0);
+        assert dout_b = 20;
+        assert dout_a = 20;
+
+        -- B wins
+        we_a0 <= '1';
+        we_b0 <= '1';
+        din_b0 <= 3;
+        tick(clk0);
+        assert dout_b = 3;
+        assert dout_a = 3;
+
+        we_a0 <= '1';
+        we_b0 <= '0';
+        for i in 0 to 255 loop
+            addr_a0 <= i;
+            din_a0 <= numbers(i);
+            tick(clk0);
+        end loop;
+
+        we_a0 <= '0';
+        for i in 0 to 255 loop
+            addr_a0 <= i;
+            tick(clk0);
+            assert dout_a = numbers(i);
+        end loop;
+    end;
+    procedure test_systolic(
+        signal clk0 : inout std_logic;
+        signal we_a0 : out std_logic;
+        signal we_b0 : out std_logic;
+        signal din_a0 : out integer;
+        signal addr_a0 : out integer
+    ) is
+    begin
+        we_a0 <= '1';
+        we_b0 <= '0';
+        for i in numbers'range loop
+            addr_a0 <= i;
+            din_a0 <= numbers(i);
+            tick(clk0);
+            report "i " & to_string(i);
+        end loop;
+    end;
+
 begin
     dp_bram0: entity dp_bram
         generic map(
@@ -62,64 +149,18 @@ begin
     begin
         clk <= '0';
         tick(clk);
-
-        addr_a <= 0;
-        we_a <= '1';
-        din_a <= 1234;
-
-        tick(clk);
-        assert dout_a = 1234;
-
-        addr_a <= 10;
-        din_a <= 4321;
-
-        tick(clk);
-        assert dout_a = 4321;
-
-        addr_a <= 0;
-        we_a <= '0';
-        tick(clk);
-        assert dout_a = 1234;
-
-        -- Collissions
-
-        addr_a <= 1;
-        addr_b <= 1;
-        din_a <= 5;
-        din_b <= 20;
-        we_a <= '1';
-        tick(clk);
-        assert dout_a = 5;
-        assert dout_b = 5;
-
-        we_a <= '0';
-        we_b <= '1';
-        tick(clk);
-        assert dout_b = 20;
-        assert dout_a = 20;
-
-        -- B wins
-        we_a <= '1';
-        we_b <= '1';
-        din_b <= 3;
-        tick(clk);
-        assert dout_b = 3;
-        assert dout_a = 3;
-
-        we_a <= '1';
-        we_b <= '0';
-        for i in 0 to 255 loop
-            addr_a <= i;
-            din_a <= numbers(i);
-            tick(clk);
-        end loop;
-
-        we_a <= '0';
-        for i in 0 to 255 loop
-            addr_a <= i;
-            tick(clk);
-            assert dout_a = numbers(i);
-        end loop;
+        test_collissions(
+            clk,
+            addr_a, addr_b,
+            we_a, we_b,
+            din_a, din_b,
+            dout_a);
+        test_systolic(
+            clk,
+            we_a, we_b,
+            din_a,
+            addr_a
+        );
 
         assert false report "all tests passed" severity note;
         wait;

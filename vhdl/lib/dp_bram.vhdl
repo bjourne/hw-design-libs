@@ -8,7 +8,6 @@ use ieee.std_logic_1164.all;
 
 entity dp_bram is
     generic (
-        WIDTH : positive := 18;
         DEPTH : positive := 1000
     );
     port (
