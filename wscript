@@ -1,4 +1,4 @@
-# Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
+# Copyright (C) 2022-2023 Björn A. Lindqvist <bjourne@gmail.com>
 from pathlib import Path
 from subprocess import check_output
 
@@ -90,7 +90,17 @@ def build(ctx):
     build_verilator_tb(ctx, 'matmul')
 
     # GHDL stuff
-    vhdl_lib_files = list(PATH_VHDL_LIB.glob('*.vhdl'))
+    vhdl_lib_files = [
+        'parity.vhdl',
+        'systolic.vhdl',
+        'dp_bram.vhdl',
+        'full_adder.vhdl',
+        'half_adder.vhdl',
+        'wallace_tree.vhdl',
+        'ieee754.vhdl',
+        'math.vhdl'
+    ]
+    vhdl_lib_files = [PATH_VHDL_LIB / n for n in vhdl_lib_files]
     vhdl_tb_files = list(PATH_VHDL_TB.glob('*.vhdl'))
 
     # Not sure how vhdl packages work.
