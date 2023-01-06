@@ -43,11 +43,15 @@ def build_verilator_tb(ctx, name):
         source = map(str, source),
         rule = rule)
 
-def build_vhdl_lib(ctx, source, lib_name):
-    lib_file = '%s-obj08.cf' % lib_name
-    rule = 'rm -f ${TGT} && ${GHDL} -a --std=08 --work=%s ${SRC}' % lib_name
-    ctx(target = lib_file,
-        source = map(str, source),
+def vhdl_analyze(ctx, vhdl_files, target_lib, use_lib):
+    rule_fmt = 'rm -f ${TGT} && ${GHDL} -a --work=%s --std=08 %s'
+    source = ' '.join(str(Path('..') / f) for f in vhdl_files)
+    rule = rule_fmt % (target_lib, source)
+    vhdl_source = list(map(str, vhdl_files))
+    if use_lib:
+        vhdl_source += ['%s-obj08.cf' % use_lib]
+    ctx(target = '%s-obj08.cf' % target_lib,
+        source = vhdl_source,
         rule = rule)
 
 def build_vhdl_objs(ctx, source, lib_name):
@@ -70,14 +74,6 @@ def build_vhdl_tb(ctx, tb_name, lib_name):
         source = map(str, source),
         rule = rule)
 
-def build_vhdl_tbs_no_gen(ctx, tb_paths, lib_name):
-    for tb_path in tb_paths:
-        source = [tb_path, '%s-obj08.cf' % lib_name]
-        rule = '${GHDL} -a --std=08 %s' % str(Path('..') / tb_path)
-        ctx(target = 'work-obj08.cf',
-            source = list(map(str, source)),
-            rule = rule)
-
 def build(ctx):
     build_verilog_module(ctx, 'counter')
     build_verilog_module(ctx, 'divider')
@@ -91,6 +87,9 @@ def build(ctx):
 
     # GHDL stuff
     vhdl_lib_files = [
+        'math.vhdl',
+        'io.vhdl',
+        'dct8.vhdl',
         'parity.vhdl',
         'systolic.vhdl',
         'dp_bram.vhdl',
@@ -98,19 +97,25 @@ def build(ctx):
         'half_adder.vhdl',
         'wallace_tree.vhdl',
         'ieee754.vhdl',
-        'math.vhdl'
     ]
     vhdl_lib_files = [PATH_VHDL_LIB / n for n in vhdl_lib_files]
     vhdl_tb_files = list(PATH_VHDL_TB.glob('*.vhdl'))
 
+    testbenches = [
+        'tb_ieee754',
+        'tb_math',
+        'tb_parity',
+        'tb_systolic',
+        'tb_wallace_tree',
+        'tb_dct8'
+    ]
+
     # Not sure how vhdl packages work.
-    build_vhdl_lib(ctx, vhdl_lib_files, 'bjourne')
+    vhdl_analyze(ctx, vhdl_lib_files, 'bjourne', None)
+    #build_vhdl_lib(ctx, vhdl_lib_files, 'bjourne')
     if ctx.env['GHDL_OBJ_GEN']:
         build_vhdl_objs(ctx, vhdl_tb_files, 'bjourne')
-        build_vhdl_tb(ctx, 'tb_ieee754', 'bjourne')
-        build_vhdl_tb(ctx, 'tb_math', 'bjourne')
-        build_vhdl_tb(ctx, 'tb_parity', 'bjourne')
-        build_vhdl_tb(ctx, 'tb_systolic', 'bjourne')
-        build_vhdl_tb(ctx, 'tb_wallace_tree', 'bjourne')
+        for tb in testbenches:
+            build_vhdl_tb(ctx, tb, 'bjourne')
     else:
-        build_vhdl_tbs_no_gen(ctx, vhdl_tb_files, 'bjourne')
+        vhdl_analyze(ctx, vhdl_tb_files, 'work', 'bjourne')
