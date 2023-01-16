@@ -88,8 +88,11 @@ def build(ctx):
     # GHDL stuff
     vhdl_lib_files = [
         'math.vhdl',
+        'types.vhdl',
+        'utils.vhdl',
         'io.vhdl',
         'dct8.vhdl',
+        'dct8x8.vhdl',
         'parity.vhdl',
         'systolic.vhdl',
         'dp_bram.vhdl',
