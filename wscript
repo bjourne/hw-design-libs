@@ -90,6 +90,7 @@ def build(ctx):
         'math.vhdl',
         'types.vhdl',
         'utils.vhdl',
+        'invsqrt_f32.vhdl',
         'io.vhdl',
         'dct8.vhdl',
         'dct8x8.vhdl',
@@ -104,21 +105,11 @@ def build(ctx):
     vhdl_lib_files = [PATH_VHDL_LIB / n for n in vhdl_lib_files]
     vhdl_tb_files = list(PATH_VHDL_TB.glob('*.vhdl'))
 
-    testbenches = [
-        'tb_ieee754',
-        'tb_math',
-        'tb_parity',
-        'tb_systolic',
-        'tb_wallace_tree',
-        'tb_dct8'
-    ]
-
     # Not sure how vhdl packages work.
     vhdl_analyze(ctx, vhdl_lib_files, 'bjourne', None)
-    #build_vhdl_lib(ctx, vhdl_lib_files, 'bjourne')
     if ctx.env['GHDL_OBJ_GEN']:
         build_vhdl_objs(ctx, vhdl_tb_files, 'bjourne')
-        for tb in testbenches:
-            build_vhdl_tb(ctx, tb, 'bjourne')
+        for tb in vhdl_tb_files:
+            build_vhdl_tb(ctx, tb.stem, 'bjourne')
     else:
         vhdl_analyze(ctx, vhdl_tb_files, 'work', 'bjourne')
