@@ -1,4 +1,4 @@
-// Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
+// Copyright (C) 2022-2023 Björn A. Lindqvist <bjourne@gmail.com>
 //
 // Systolic array controller. How it works? See this excellent video:
 // https://www.youtube.com/watch?v=vADVh1ogNo0
@@ -33,7 +33,7 @@ module syst_array #(parameter WIDTH=8) (
     logic [0:0] p;
     logic [3:0] cnt;
 
-    wire [0:0] in_ready = !p;
+    assign in_ready = !p;
     wire [3:0] next_cnt = in_valid & in_ready ? 0 : cnt + 1;
 
     logic [WIDTH-1:0] row [0:4];

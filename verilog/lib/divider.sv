@@ -1,4 +1,4 @@
-// Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
+// Copyright (C) 2022-2023 Björn A. Lindqvist <bjourne@gmail.com>
 //
 // This module is an adaptation of
 // https://github.com/projf/projf-explore/blob/main/lib/maths/div_int.sv
@@ -23,13 +23,13 @@ module divider #(parameter WIDTH=4) (
     wire [WIDTH:0] ac_sub_y1 = acq[2*WIDTH:WIDTH] - y1;
 
     // Outputs
-    wire in_ready = !p;
-    wire out_valid = p & (i == 0);
-    wire dbz = begin_p & (y == 0);
+    assign in_ready = !p;
+    assign out_valid = p & (i == 0);
+    assign dbz = begin_p & (y == 0);
 
     // This is wrong because it is delayed one cycle.
-    wire [WIDTH-1:0] r = acq[2*WIDTH:WIDTH+1];
-    wire [WIDTH-1:0] q = acq[WIDTH-1:0];
+    assign r = acq[2*WIDTH:WIDTH+1];
+    assign q = acq[WIDTH-1:0];
 
     always @(posedge clk) begin
         if (!nrst)
@@ -50,7 +50,6 @@ module divider #(parameter WIDTH=4) (
         end else if (acq[2*WIDTH:WIDTH] >= y1)
             acq <= {ac_sub_y1[WIDTH-1:0], acq[WIDTH-1:0], 1'b1};
         else begin
-            // This could be a left shift
             acq <= acq << 1;
         end
     end
