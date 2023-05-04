@@ -90,6 +90,7 @@ def build(ctx):
         'math.vhdl',
         'types.vhdl',
         'utils.vhdl',
+        'histogram.vhdl',
         'invsqrt_f32.vhdl',
         'io.vhdl',
         'dct8.vhdl',
