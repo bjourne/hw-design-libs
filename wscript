@@ -91,6 +91,11 @@ def build(ctx):
         'types.vhdl',
         'utils.vhdl',
         'histogram.vhdl',
+
+        # For simulating pipelining
+        'pl_adder.vhdl',
+        'histogram2.vhdl',
+
         'invsqrt_f32.vhdl',
         'io.vhdl',
         'dct8.vhdl',

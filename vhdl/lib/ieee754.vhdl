@@ -1,4 +1,7 @@
--- Copyright (C) 2022 Björn A. Lindqvist <bjourne@gmail.com>
+-- Copyright (C) 2022-2023 Björn A. Lindqvist <bjourne@gmail.com>
+--
+-- VHDL 2008 supports ieee754 floating point types, but I  think it is fun to
+-- write the code manually.
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;

@@ -36,12 +36,12 @@ begin
             else
                 if i = N then
                     report "done";
-                    for n in 0 to M - 1 loop
+                    for l in 0 to M - 1 loop
                         s := 0;
                         for j in 0 to K - 1 loop
-                            s := s + buf(j)(n);
+                            s := s + buf(j)(l);
                         end loop;
-                        H(n) <= s;
+                        H(l) <= s;
                     end loop;
                 else
                     for j in 0 to K - 1 loop

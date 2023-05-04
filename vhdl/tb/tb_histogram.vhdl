@@ -30,7 +30,6 @@ begin
         );
     process
     begin
-
         clk <= '0';
         nrst <= '0';
         tick(clk);
@@ -45,15 +44,6 @@ begin
             tick(clk);
             io.write_arr(H);
         end loop;
-
-
-        -- tick(clk);
-        -- io.write_arr(H);
-
-
-        -- tick(clk);
-        -- io.write_arr(H);
-
 
         assert false report "all tests passed" severity note;
         wait;
