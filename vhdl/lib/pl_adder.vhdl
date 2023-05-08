@@ -39,7 +39,7 @@ begin
                     p <= '1';
                 elsif i = 1 then
                     -- We post the result one cycle earlier.
-                    z <= x +  y;
+                    z <= x + y;
                 elsif i = 0 then
                     p <= '0';
                 else
