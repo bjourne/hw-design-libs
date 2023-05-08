@@ -1,8 +1,10 @@
 -- Copyright (C) 2023 Björn A. Lindqvist <bjourne@gmail.com>
 library bjourne;
+library bjourne_pl;
 library ieee;
 use ieee.numeric_std.all;
 use ieee.std_logic_1164.all;
+use std.textio.all;
 use bjourne.all;
 use bjourne.utils.all;
 use bjourne.types.all;
@@ -12,60 +14,110 @@ end tb_histogram2;
 
 
 architecture beh of tb_histogram2 is
-    signal m : std_logic;
-    signal clk, nrst : std_logic;
-    signal x, y, z : integer;
+    procedure write_port(l0 : inout line; r : std_logic; v : std_logic; d : integer) is
+    begin
+        write(l0, string'("   "));
+        io.write_bool(l0, r);
+        io.write_bool(l0, v);
+        io.write_int(l0, d);
+    end procedure;
 
-    -- Communication
-    signal in_valid, in_ready, out_valid : std_logic;
+    procedure write_ports(r : std_logic_vector;
+                          v : std_logic_vector;
+                          d : integer_vector) is
+        variable l0 : line;
+    begin
+        for i in r'range loop
+            if i > 0 then
+                write(l0, string'(" "));
+            end if;
+            write_port(l0, r(i), v(i), d(i));
+        end loop;
+        writeline(output, l0);
+    end procedure;
+
+    procedure debug_adder(line0 : inout line; x0_r : std_logic) is
+    begin
+        io.write_bool(line0, x0_r);
+    end procedure;
+
+    signal clk, nrst : std_logic;
+
+    -- First upstream
+    signal x0_v, x0_r : std_logic;
+    signal x0_d : integer;
+
+    signal y0_v, y0_r : std_logic;
+    signal y0_d : integer;
+
+    signal z0_v, z0_r : std_logic;
+    signal z0_d : integer;
+
 begin
-    pl_adder_0: entity pl_adder
+    adder_0: entity bjourne_pl.adder
         generic map (
             LATENCY => 4
         )
         port map (
             clk => clk,
             nrst => nrst,
-            x => x,
-            y => y,
-            z => z,
-            in_valid => in_valid,
-            in_ready => in_ready,
-            out_valid => out_valid
+
+            u0_v => x0_v,
+            u0_d => x0_d,
+            u0_r => x0_r,
+
+            u1_v => y0_v,
+            u1_d => y0_d,
+            u1_r => y0_r,
+
+            d0_v => z0_v,
+            d0_d => z0_d,
+            d0_r => z0_r
         );
     process
+        variable line0 : line;
+
+        variable x_ds : integer_vector(0 to 2) := (3, 4, 9);
+        variable y_ds : integer_vector(0 to 2) := (10, 15, 19);
+        variable x_i : integer := 0;
+        variable y_i : integer := 0;
+
     begin
+        write(line0, string'("x0: r v   D"));
+        write(line0, string'(" "));
+        write(line0, string'("y0: r v   D"));
+        write(line0, string'(" "));
+        write(line0, string'("z0: r v   D"));
+        writeline(output, line0);
+
         clk <= '0';
         nrst <= '0';
-        in_valid <= '0';
+
+        x0_v <= '0';
+        y0_v <= '0';
+        z0_r <= '0';
 
         tick(clk);
 
-        report "begin processing";
-
-        in_valid <= '1';
         nrst <= '1';
-        x <= 15;
-        y <= 10;
 
-        tick(clk);
-        report to_string(z);
+        for i in 0 to 20 loop
+            tick(clk);
+            write_ports((x0_r, y0_r, z0_r),
+                        (x0_v, y0_v, z0_v),
+                        (x0_d, y0_d, z0_d));
 
-        tick(clk);
-        report to_string(z);
-
-        tick(clk);
-        report to_string(z);
-
-        tick(clk);
-        report "done: " & to_string(out_valid) & " " & to_string(z);
-
-        -- tick(clk);
-        -- report to_string(z);
-
-        -- tick(clk);
-        -- report to_string(z);
-
+            if (x0_r = '1') and (x_i < x_ds'length) then
+                x0_v <= '1';
+                x0_d <= x_ds(x_i);
+                x_i := x_i + 1;
+            end if;
+            if (y0_r = '1') and (y_i < y_ds'length) then
+                y0_v <= '1';
+                y0_d <= y_ds(y_i);
+                y_i := y_i + 1;
+            end if;
+        end loop;
         assert false report "all tests passed" severity note;
         wait;
     end process;

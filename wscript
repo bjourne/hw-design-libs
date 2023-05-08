@@ -91,11 +91,7 @@ def build(ctx):
         'types.vhdl',
         'utils.vhdl',
         'histogram.vhdl',
-
-        # For simulating pipelining
-        'pl_adder.vhdl',
         'histogram2.vhdl',
-
         'invsqrt_f32.vhdl',
         'io.vhdl',
         'dct8.vhdl',
@@ -109,10 +105,16 @@ def build(ctx):
         'ieee754.vhdl',
     ]
     vhdl_lib_files = [PATH_VHDL_LIB / n for n in vhdl_lib_files]
-    vhdl_tb_files = list(PATH_VHDL_TB.glob('*.vhdl'))
+    vhdl_analyze(ctx, vhdl_lib_files, 'bjourne', None)
+
+
+    # The bjourne_pl package
+    files = ['adder.vhdl']
+    lib_files = [PATH_VHDL_LIB / 'pl' / n for n in files]
+    vhdl_analyze(ctx, lib_files, 'bjourne_pl', None)
 
     # Not sure how vhdl packages work.
-    vhdl_analyze(ctx, vhdl_lib_files, 'bjourne', None)
+    vhdl_tb_files = list(PATH_VHDL_TB.glob('*.vhdl'))
     if ctx.env['GHDL_OBJ_GEN']:
         build_vhdl_objs(ctx, vhdl_tb_files, 'bjourne')
         for tb in vhdl_tb_files:
