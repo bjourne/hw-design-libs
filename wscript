@@ -43,30 +43,33 @@ def build_verilator_tb(ctx, name):
         source = map(str, source),
         rule = rule)
 
+def vhdl_lib_file(name):
+    return '%s-obj08.cf' % name
+
 def vhdl_analyze(ctx, vhdl_files, target_lib, use_lib):
     rule_fmt = 'rm -f ${TGT} && ${GHDL} -a --work=%s --std=08 %s'
     source = ' '.join(str(Path('..') / f) for f in vhdl_files)
     rule = rule_fmt % (target_lib, source)
     vhdl_source = list(map(str, vhdl_files))
     if use_lib:
-        vhdl_source += ['%s-obj08.cf' % use_lib]
+        vhdl_source += [vhdl_lib_file(use_lib)]
     ctx(target = '%s-obj08.cf' % target_lib,
         source = vhdl_source,
         rule = rule)
 
-def build_vhdl_objs(ctx, source, lib_name):
+def build_vhdl_objs(ctx, source, libs):
     # Really annoying hackish hacks.
-    lib_file = '%s-obj08.cf' % lib_name
+    libs = [vhdl_lib_file(n) for n in libs]
     target = [f'{s.stem}.o' for s in source]
     rule = '${GHDL} -a --std=08 %s' % ' '.join(
         str(Path('..') / s) for s in source)
     ctx(target = target,
-        source = list(map(str, source)) + [lib_file],
+        source = list(map(str, source)) + libs,
         rule = rule)
 
 def build_vhdl_tb(ctx, tb_name, lib_name):
     source = [PATH_VHDL_TB / f'{tb_name}.vhdl',
-              '%s-obj08.cf' % lib_name,
+              vhdl_lib_file(lib_name),
               '%s.o' % tb_name]
     target = PATH_VHDL_TB / tb_name
     rule = '${GHDL} -e --std=08 -o ${TGT} %s' % tb_name
@@ -85,8 +88,8 @@ def build(ctx):
     build_verilog_module(ctx, 'syst_array')
     build_verilator_tb(ctx, 'matmul')
 
-    # GHDL stuff
-    vhdl_lib_files = [
+    # Building two VHDL libs, bjourne and bjourne_pl.
+    files = [
         'math.vhdl',
         'types.vhdl',
         'utils.vhdl',
@@ -104,19 +107,18 @@ def build(ctx):
         'wallace_tree.vhdl',
         'ieee754.vhdl',
     ]
-    vhdl_lib_files = [PATH_VHDL_LIB / n for n in vhdl_lib_files]
-    vhdl_analyze(ctx, vhdl_lib_files, 'bjourne', None)
-
+    files = [PATH_VHDL_LIB / n for n in files]
+    vhdl_analyze(ctx, files, 'bjourne', None)
 
     # The bjourne_pl package
     files = ['adder.vhdl']
-    lib_files = [PATH_VHDL_LIB / 'pl' / n for n in files]
-    vhdl_analyze(ctx, lib_files, 'bjourne_pl', None)
+    files = [PATH_VHDL_LIB / 'pl' / n for n in files]
+    vhdl_analyze(ctx, files, 'bjourne_pl', None)
 
-    # Not sure how vhdl packages work.
     vhdl_tb_files = list(PATH_VHDL_TB.glob('*.vhdl'))
+    libs = ['bjourne', 'bjourne_pl']
     if ctx.env['GHDL_OBJ_GEN']:
-        build_vhdl_objs(ctx, vhdl_tb_files, 'bjourne')
+        build_vhdl_objs(ctx, vhdl_tb_files, libs)
         for tb in vhdl_tb_files:
             build_vhdl_tb(ctx, tb.stem, 'bjourne')
     else:

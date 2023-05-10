@@ -14,7 +14,10 @@ end tb_histogram2;
 
 
 architecture beh of tb_histogram2 is
-    procedure write_port(l0 : inout line; r : std_logic; v : std_logic; d : integer) is
+    procedure write_port(l0 : inout line;
+                         r : std_logic;
+                         v : std_logic;
+                         d : integer) is
     begin
         write(l0, string'("   "));
         io.write_bool(l0, r);
@@ -22,16 +25,18 @@ architecture beh of tb_histogram2 is
         io.write_int(l0, d);
     end procedure;
 
-    procedure write_ports(r : std_logic_vector;
+    procedure write_ports(i : integer;
+                          r : std_logic_vector;
                           v : std_logic_vector;
                           d : integer_vector) is
         variable l0 : line;
     begin
-        for i in r'range loop
-            if i > 0 then
+        io.write_int(l0, i);
+        for k in r'range loop
+            if k > 0 then
                 write(l0, string'(" "));
             end if;
-            write_port(l0, r(i), v(i), d(i));
+            write_port(l0, r(k), v(k), d(k));
         end loop;
         writeline(output, l0);
     end procedure;
@@ -55,9 +60,6 @@ architecture beh of tb_histogram2 is
 
 begin
     adder_0: entity bjourne_pl.adder
-        generic map (
-            LATENCY => 4
-        )
         port map (
             clk => clk,
             nrst => nrst,
@@ -77,12 +79,13 @@ begin
     process
         variable line0 : line;
 
-        variable x_ds : integer_vector(0 to 2) := (3, 4, 9);
-        variable y_ds : integer_vector(0 to 2) := (10, 15, 19);
+        variable x_ds : integer_vector(0 to 3) := (3, 4, 9, 5);
+        variable y_ds : integer_vector(0 to 3) := (10, 15, 19, 6);
         variable x_i : integer := 0;
         variable y_i : integer := 0;
 
     begin
+        write(line0, string'("    "));
         write(line0, string'("x0: r v   D"));
         write(line0, string'(" "));
         write(line0, string'("y0: r v   D"));
@@ -101,11 +104,11 @@ begin
 
         nrst <= '1';
 
-        for i in 0 to 20 loop
+        for i in 0 to 50 loop
             tick(clk);
-            write_ports((x0_r, y0_r, z0_r),
-                        (x0_v, y0_v, z0_v),
-                        (x0_d, y0_d, z0_d));
+            write_ports(i, (x0_r, y0_r, z0_r),
+                           (x0_v, y0_v, z0_v),
+                           (x0_d, y0_d, z0_d));
 
             if (x0_r = '1') and (x_i < x_ds'length) then
                 x0_v <= '1';
