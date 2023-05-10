@@ -10,6 +10,9 @@ use bjourne.utils.all;
 use bjourne.types.all;
 
 entity tb_histogram2 is
+    generic(
+        SEED : integer
+    );
 end tb_histogram2;
 
 
@@ -41,25 +44,30 @@ architecture beh of tb_histogram2 is
         writeline(output, l0);
     end procedure;
 
-    procedure debug_adder(line0 : inout line; x0_r : std_logic) is
-    begin
-        io.write_bool(line0, x0_r);
-    end procedure;
-
+    -- Standard
     signal clk, nrst : std_logic;
 
     -- First upstream
     signal x0_v, x0_r : std_logic;
     signal x0_d : integer;
 
+    -- Second upstream
     signal y0_v, y0_r : std_logic;
     signal y0_d : integer;
 
+    -- First downstream
     signal z0_v, z0_r : std_logic;
     signal z0_d : integer;
 
+    -- Second downstream
+    signal w0_v, w0_r : std_logic;
+    signal w0_d : integer;
+
 begin
     adder_0: entity bjourne_pl.adder
+        generic map (
+            SEED => SEED
+        )
         port map (
             clk => clk,
             nrst => nrst,
@@ -76,6 +84,27 @@ begin
             d0_d => z0_d,
             d0_r => z0_r
         );
+    adder_1: entity bjourne_pl.adder
+        generic map (
+            SEED => SEED + 10
+        )
+        port map (
+            clk => clk,
+            nrst => nrst,
+
+            u0_v => '1',
+            u0_d => 10,
+            --u0_r => x0_r,
+
+            u1_v => z0_v,
+            u1_d => z0_d,
+            u1_r => z0_r,
+
+            d0_v => w0_v,
+            d0_d => w0_d,
+            d0_r => w0_r
+        );
+
     process
         variable line0 : line;
 
@@ -91,25 +120,30 @@ begin
         write(line0, string'("y0: r v   D"));
         write(line0, string'(" "));
         write(line0, string'("z0: r v   D"));
+        write(line0, string'(" "));
+        write(line0, string'("w0: r v   D"));
         writeline(output, line0);
 
         clk <= '0';
         nrst <= '0';
 
+        -- No data on the line yet
         x0_v <= '0';
         y0_v <= '0';
-        z0_r <= '0';
+
+        -- Output ready to receive
+        w0_r <= '1';
 
         tick(clk);
 
         nrst <= '1';
 
-        for i in 0 to 50 loop
+        for i in 0 to 40 loop
             tick(clk);
-            write_ports(i, (x0_r, y0_r, z0_r),
-                           (x0_v, y0_v, z0_v),
-                           (x0_d, y0_d, z0_d));
-
+            write_ports(i,
+                        (x0_r, y0_r, z0_r, w0_r),
+                        (x0_v, y0_v, z0_v, w0_v),
+                        (x0_d, y0_d, z0_d, w0_d));
             if (x0_r = '1') and (x_i < x_ds'length) then
                 x0_v <= '1';
                 x0_d <= x_ds(x_i);

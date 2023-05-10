@@ -8,6 +8,9 @@ use ieee.numeric_std.all;
 use ieee.std_logic_1164.all;
 
 entity adder is
+    generic(
+        SEED : integer
+    );
     port (
         clk, nrst : in std_logic;
 
@@ -33,8 +36,8 @@ architecture rtl of adder is
 begin
     process(clk)
         variable lat : integer;
-        variable seed1 : positive := 999;
-        variable seed2 : positive := 999;
+        variable seed1 : integer := SEED;
+        variable seed2 : integer := SEED + 10;
     begin
         if rising_edge(clk) then
             if nrst = '0' then
@@ -56,19 +59,27 @@ begin
                     end if;
                     -- Begin computation
                     if (u0_r = '0') and (u1_r = '0')  then
-                        rand_range(seed1, seed2, 7, lat);
+                        rand_range(seed1, seed2, 10, lat);
                         i <= 2 + lat;
+                        -- Invalidate output while we're computing.
                         d0_v <= '0';
                     end if;
                 else
                     -- Transer outputs
                     if i = 1 then
-                        d0_d <= o0 + o1;
-                        d0_v <= '1';
-                        u0_r <= '1';
-                        u1_r <= '1';
+                        if d0_r then
+                            d0_d <= o0 + o1;
+                            d0_v <= '1';
+                            u0_r <= '1';
+                            u1_r <= '1';
+                            i <= i - 1;
+                        else
+                            report "stall!";
+                            i <= i;
+                        end if;
+                    else
+                        i <= i - 1;
                     end if;
-                    i <= i - 1;
                 end if;
             end if;
         end if;
